@@ -11,6 +11,7 @@
   <style>
     body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     #map { width: 100vw; height: 100vh; }
+    
     /* Estilos ultra compactos para las etiquetas de los EESS */
     .label-eess {
       background: rgba(255, 255, 255, 0.92) !important;
@@ -29,26 +30,71 @@
       text-align: center !important;         /* Texto centrado dentro del recuadro */
       word-wrap: break-word !important;
     }
-    
-    /* Botón flotante para GPS */
-    .btn-gps {
+
+    /* Clase para ocultar etiquetas cuando están inactivas */
+    .label-eess-hidden {
+      display: none !important;
+    }
+
+    /* Panel de controles superiores derechos */
+    .controls-container {
       position: absolute;
       top: 15px;
       right: 15px;
       z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    
+    /* Botón flotante para GPS */
+    .btn-gps {
       background: #007bff;
       color: white;
       border: none;
-      padding: 12px 18px;
+      padding: 10px 16px;
       border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
-      font-size: 14px;
+      font-size: 13px;
       box-shadow: 0 3px 6px rgba(0,0,0,0.3);
       transition: background 0.2s, transform 0.1s;
+      width: 100%;
     }
     .btn-gps:hover { background: #0056b3; }
     .btn-gps:active { transform: scale(0.98); }
+
+    /* Botón para alternar etiquetas */
+    .btn-toggle-labels {
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+      transition: background 0.2s;
+      width: 100%;
+    }
+    .btn-toggle-labels.active { background: #28a745; }
+
+    /* Filtro de Selección */
+    .select-tipo {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      cursor: pointer;
+      outline: none;
+      width: 100%;
+    }
 
     /* Estilos para el Popup */
     .popup-eess { font-size: 13px; line-height: 1.5; color: #333; }
@@ -86,7 +132,16 @@
 </head>
 <body>
 
-  <button class="btn-gps" onclick="obtenerUbicacionGPS()">📍 Mi Ubicación GPS</button>
+  <!-- Contenedor de Controles Flotantes -->
+  <div class="controls-container">
+    <button class="btn-gps" onclick="obtenerUbicacionGPS()">📍 Mi Ubicación GPS</button>
+    <button id="btnToggleLabels" class="btn-toggle-labels" onclick="toggleEtiquetas()">🏷️ Etiquetas: OFF</button>
+    <select id="selectTipoAtencion" class="select-tipo" onchange="filtrarPorTipoAtencion()">
+      <option value="TODOS">🔍 Mostrar Todos los EESS</option>
+      <option value="UVICLIN">🏥 Solo UVICLIN</option>
+      <option value="UNIDAD FEBRIL">🌡️ Solo UNIDAD FEBRIL</option>
+    </select>
+  </div>
 
   <!-- Leyenda del Mapa -->
   <div class="legend">
@@ -148,10 +203,14 @@
     }).addTo(map);
 
     let eessGeoJSON = null;
+    let geojsonLayer = null;
     let userMarker = null;
     let rutaLayer = null;
+    
+    // Estado global de las etiquetas (OFF por defecto)
+    let etiquetasVisibles = false;
 
-    // 3. Iconos personalizados consumiendo archivos png locales de GitHub
+    // 3. Iconos personalizados consumiendo archivos png
     const iconUviclin = L.icon({
       iconUrl: 'uviclin.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -191,44 +250,89 @@
 
     eessGeoJSON = turf.featureCollection(featuresConvertidos);
 
-    // 4. Cargar capa en el mapa con simbología y etiquetas permanentes
-    L.geoJSON(eessGeoJSON, {
-      pointToLayer: function (feature, latlng) {
-        const tipo = feature.properties.tipo_atencion;
-        if (tipo === "UVICLIN") return L.marker(latlng, { icon: iconUviclin });
-        if (tipo === "UNIDAD FEBRIL") return L.marker(latlng, { icon: iconFebril });
-        return L.marker(latlng, { icon: iconDefault });
-      },
-      onEachFeature: (feature, layer) => {
-        const p = feature.properties;
-        let badgeClass = 'badge badge-default';
-        if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
-        if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
-
-        // --- NUEVO: Agregar etiqueta con el campo NOM_EESS_RECOR ---
-        layer.bindTooltip(p.NOM_EESS_RECOR || p.NOMBRE, {
-          permanent: true,        // 'true' para que se vea siempre, 'false' para ver solo al pasar el cursor
-          direction: 'bottom',    // Posición respecto al icono: 'top', 'bottom', 'left', 'right'
-          offset: [0, 8],         // Desplazamiento en píxeles [X, Y]
-          className: 'label-eess' // Clase CSS personalizada para estilo
-        });
-
-        // Contenido del Popup al hacer clic
-        const popupContent = `
-          <div class="popup-eess">
-            <b>${p.NOM_EESS_RECOR}</b><br>
-            <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria}</span><br>
-            <b>Distrito:</b> ${p.Distrito}<br>
-            <b>Dirección:</b> ${p.DIRECCION}<br>
-            <b>Camas Disponibles:</b> ${p.camas_disponibles || 0}<br>
-            <b>Camillas Disponibles:</b> ${p.camillas_disponibles || 0}
-          </div>
-        `;
-        layer.bindPopup(popupContent);
+    // 4. Función principal para renderizar la capa (con soporte de filtrado)
+    function renderizarMapa(filtroTipo = "TODOS") {
+      // Limpiar capa previa si existe
+      if (geojsonLayer) {
+        map.removeLayer(geojsonLayer);
       }
-    }).addTo(map);
 
-    // 5. Geolocalización por GPS
+      // Filtrar features según el select
+      const featuresFiltrados = eessGeoJSON.features.filter(f => {
+        if (filtroTipo === "TODOS") return true;
+        return f.properties.tipo_atencion === filtroTipo;
+      });
+
+      const geojsonFiltrado = turf.featureCollection(featuresFiltrados);
+
+      // Clase CSS para controlar si las etiquetas están visibles u ocultas por defecto
+      const labelClass = etiquetasVisibles ? 'label-eess' : 'label-eess label-eess-hidden';
+
+      geojsonLayer = L.geoJSON(geojsonFiltrado, {
+        pointToLayer: function (feature, latlng) {
+          const tipo = feature.properties.tipo_atencion;
+          if (tipo === "UVICLIN") return L.marker(latlng, { icon: iconUviclin });
+          if (tipo === "UNIDAD FEBRIL") return L.marker(latlng, { icon: iconFebril });
+          return L.marker(latlng, { icon: iconDefault });
+        },
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+          let badgeClass = 'badge badge-default';
+          if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
+          if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
+
+          // Asignar tooltip/etiqueta
+          layer.bindTooltip(p.NOM_EESS_RECOR || p.NOMBRE, {
+            permanent: true,
+            direction: 'bottom',
+            offset: [0, 8],
+            className: labelClass
+          });
+
+          // Contenido del Popup
+          const popupContent = `
+            <div class="popup-eess">
+              <b>${p.NOM_EESS_RECOR}</b><br>
+              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria}</span><br>
+              <b>Distrito:</b> ${p.Distrito}<br>
+              <b>Dirección:</b> ${p.DIRECCION}<br>
+              <b>Camas Disponibles:</b> ${p.camas_disponibles || 0}<br>
+              <b>Camillas Disponibles:</b> ${p.camillas_disponibles || 0}
+            </div>
+          `;
+          layer.bindPopup(popupContent);
+        }
+      }).addTo(map);
+    }
+
+    // Inicializar mapa mostrando todos los puntos (etiquetas apagadas por defecto)
+    renderizarMapa("TODOS");
+
+    // 5. Función para Activar/Desactivar Etiquetas
+    function toggleEtiquetas() {
+      etiquetasVisibles = !etiquetasVisibles;
+      const btn = document.getElementById('btnToggleLabels');
+      const etiquetas = document.querySelectorAll('.label-eess');
+
+      if (etiquetasVisibles) {
+        btn.innerText = '🏷️ Etiquetas: ON';
+        btn.classList.add('active');
+        etiquetas.forEach(el => el.classList.remove('label-eess-hidden'));
+      } else {
+        btn.innerText = '🏷️ Etiquetas: OFF';
+        btn.classList.remove('active');
+        etiquetas.forEach(el => el.classList.add('label-eess-hidden'));
+      }
+    }
+
+    // 6. Función para Filtrar por Tipo de Atención
+    function filtrarPorTipoAtencion() {
+      const valorSeleccionado = document.getElementById('selectTipoAtencion').value;
+      if (rutaLayer) map.removeLayer(rutaLayer); // Limpiar ruta previa si cambia el filtro
+      renderizarMapa(valorSeleccionado);
+    }
+
+    // 7. Geolocalización por GPS (calcula el más cercano considerando los puntos filtrados)
     function obtenerUbicacionGPS() {
       if (!navigator.geolocation) {
         alert("Tu dispositivo o navegador no soporta geolocalización por GPS.");
@@ -251,19 +355,31 @@
 
           map.setView([userLat, userLng], 14);
 
-          if (eessGeoJSON) {
-            calcularRutaEESSMasCercano(userLngLat);
-          }
+          calcularRutaEESSMasCercano(userLngLat);
         },
         (error) => alert("Error al obtener GPS: " + error.message),
         { enableHighAccuracy: true }
       );
     }
 
-    // 6. Cálculo de EESS más cercano y trazo de ruta con OSRM
+    // 8. Cálculo del más cercano y trazo de ruta
     function calcularRutaEESSMasCercano(userLngLat) {
+      const filtroActual = document.getElementById('selectTipoAtencion').value;
+      
+      // Obtener la colección de puntos filtrados según la selección actual
+      const featuresVisibles = eessGeoJSON.features.filter(f => {
+        if (filtroActual === "TODOS") return true;
+        return f.properties.tipo_atencion === filtroActual;
+      });
+
+      if (featuresVisibles.length === 0) {
+        alert("No hay establecimientos disponibles para el filtro seleccionado.");
+        return;
+      }
+
+      const geojsonEvaluar = turf.featureCollection(featuresVisibles);
       const origenTurf = turf.point(userLngLat);
-      const masCercano = turf.nearestPoint(origenTurf, eessGeoJSON);
+      const masCercano = turf.nearestPoint(origenTurf, geojsonEvaluar);
       const destinoCoords = masCercano.geometry.coordinates;
       const p = masCercano.properties;
 
@@ -285,11 +401,16 @@
             if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
             if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
 
-            L.popup()
+            // Crear el popup con offset vertical negativo para posicionado por encima del símbolo
+            L.popup({
+              offset: [0, -35],           // Eleva el bocadillo 35px por encima del punto
+              autoPan: true,              // Reubica el mapa automáticamente para no cortar el popup
+              autoPanPadding: [20, 20]    // Margen de seguridad con los bordes de la pantalla
+            })
               .setLatLng([destinoCoords[1], destinoCoords[0]])
               .setContent(`
                 <div class="popup-eess">
-                  <b>EESS Más Cercano:</b> ${p.NOM_EESS_RECOR}<br>
+                  <b>EESS Más Cercano (${filtroActual}):</b> ${p.NOM_EESS_RECOR}<br>
                   <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria}</span><br>
                   <b>Dirección:</b> ${p.DIRECCION}<hr>
                   <b>Distancia vial:</b> ${distanciaKm} km<br>
