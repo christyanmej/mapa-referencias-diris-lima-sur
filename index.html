@@ -11,6 +11,24 @@
   <style>
     body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     #map { width: 100vw; height: 100vh; }
+    /* Estilos ultra compactos para las etiquetas de los EESS */
+    .label-eess {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid #0056b3 !important;
+      border-radius: 3px !important;
+      color: #111 !important;
+      font-weight: 600 !important;
+      font-size: 8.5px !important;          /* Tamaño de fuente más pequeño */
+      line-height: 1.1 !important;           /* Menor espacio entre líneas */
+      padding: 1px 3px !important;           /* Relleno interno muy estrecho */
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+      
+      /* Control para hacer el recuadro estrecho */
+      max-width: 85px !important;            /* Ancho máximo ajustado */
+      white-space: normal !important;        /* Permite que el texto baje de línea */
+      text-align: center !important;         /* Texto centrado dentro del recuadro */
+      word-wrap: break-word !important;
+    }
     
     /* Botón flotante para GPS */
     .btn-gps {
@@ -44,8 +62,8 @@
       border-radius: 4px;
       margin-top: 4px;
     }
-    .badge-uviclin { background-color: #007bff; }
-    .badge-febril { background-color: #dc3545; }
+    .badge-uviclin { background-color: #f2470a; }
+    .badge-febril { background-color: #11bf87; }
     .badge-default { background-color: #6c757d; }
 
     /* Leyenda flotante en el mapa */
@@ -173,7 +191,7 @@
 
     eessGeoJSON = turf.featureCollection(featuresConvertidos);
 
-    // 4. Cargar capa en el mapa con simbología por tipo de atención
+    // 4. Cargar capa en el mapa con simbología y etiquetas permanentes
     L.geoJSON(eessGeoJSON, {
       pointToLayer: function (feature, latlng) {
         const tipo = feature.properties.tipo_atencion;
@@ -187,6 +205,15 @@
         if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
         if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
 
+        // --- NUEVO: Agregar etiqueta con el campo NOM_EESS_RECOR ---
+        layer.bindTooltip(p.NOM_EESS_RECOR || p.NOMBRE, {
+          permanent: true,        // 'true' para que se vea siempre, 'false' para ver solo al pasar el cursor
+          direction: 'bottom',    // Posición respecto al icono: 'top', 'bottom', 'left', 'right'
+          offset: [0, 8],         // Desplazamiento en píxeles [X, Y]
+          className: 'label-eess' // Clase CSS personalizada para estilo
+        });
+
+        // Contenido del Popup al hacer clic
         const popupContent = `
           <div class="popup-eess">
             <b>${p.NOM_EESS_RECOR}</b><br>
