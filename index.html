@@ -2,14 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Buscador de EESS y Rutas - DIRIS Lima Sur</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Turf.js para análisis espacial -->
   <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
   <style>
-    body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     #map { width: 100vw; height: 100vh; }
     
+    /* Botón flotante para GPS */
     .btn-gps {
       position: absolute;
       top: 15px;
@@ -24,30 +27,60 @@
       font-weight: bold;
       font-size: 14px;
       box-shadow: 0 3px 6px rgba(0,0,0,0.3);
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.1s;
     }
     .btn-gps:hover { background: #0056b3; }
+    .btn-gps:active { transform: scale(0.98); }
 
-    .popup-eess { font-size: 13px; line-height: 1.4; }
+    /* Estilos para el Popup */
+    .popup-eess { font-size: 13px; line-height: 1.5; color: #333; }
     .popup-eess b { color: #0056b3; }
     .badge {
       display: inline-block;
-      padding: 2px 6px;
+      padding: 3px 8px;
       font-size: 11px;
       font-weight: bold;
       color: white;
-      border-radius: 3px;
-      background-color: #28a745;
+      border-radius: 4px;
+      margin-top: 4px;
     }
+    .badge-uviclin { background-color: #007bff; }
+    .badge-febril { background-color: #dc3545; }
+    .badge-default { background-color: #6c757d; }
+
+    /* Leyenda flotante en el mapa */
+    .legend {
+      position: absolute;
+      bottom: 25px;
+      left: 15px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .legend-title { font-weight: bold; margin-bottom: 4px; color: #222; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-item img { width: 20px; height: 20px; object-fit: contain; }
   </style>
 </head>
 <body>
 
   <button class="btn-gps" onclick="obtenerUbicacionGPS()">📍 Mi Ubicación GPS</button>
+
+  <!-- Leyenda del Mapa -->
+  <div class="legend">
+    <div class="legend-title">Simbología EESS</div>
+    <div class="legend-item"><img src="uviclin.png" alt="UVICLIN" onerror="this.src='https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png'"> UVICLIN</div>
+    <div class="legend-item"><img src="febril.png" alt="UNIDAD FEBRIL" onerror="this.src='https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png'"> UNIDAD FEBRIL</div>
+  </div>
+
   <div id="map"></div>
 
   <script>
-    // 1. Cargar datos directamente en una variable JS (Evita problemas de CORS al abrir offline/local)
+    // 1. Datos GeoJSON integrados (DIRIS Lima Sur)
     const rawData = {
       "type": "FeatureCollection",
       "crs": { "type": "name", "properties": { "name": "EPSG:3857" } },
@@ -88,7 +121,7 @@
       ]
     };
 
-    // 2. Inicializar mapa en Lima Sur
+    // 2. Inicializar mapa centrado en Lima Sur
     const map = L.map('map').setView([-12.203, -76.973], 12);
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -100,14 +133,39 @@
     let userMarker = null;
     let rutaLayer = null;
 
-    // Convertir Web Mercator (EPSG:3857) a WGS84 (EPSG:4326)
+    // 3. Iconos personalizados consumiendo archivos png locales de GitHub
+    const iconUviclin = L.icon({
+      iconUrl: 'uviclin.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -30]
+    });
+
+    const iconFebril = L.icon({
+      iconUrl: 'febril.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -30]
+    });
+
+    const iconDefault = L.icon({
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34]
+    });
+
+    // Conversión matemática de Web Mercator (EPSG:3857) a WGS84 (EPSG:4326)
     function webMercatorToWGS84(x, y) {
       const lng = (x / 6378137.0) * (180 / Math.PI);
       const lat = (Math.atan(Math.exp(y / 6378137.0)) - (Math.PI / 4)) * 2 * (180 / Math.PI);
       return [lng, lat];
     }
 
-    // Procesar datos para Turf.js
+    // Procesar coordenadas a WGS84
     const featuresConvertidos = rawData.features.map(f => {
       const coordsWGS84 = webMercatorToWGS84(f.geometry.coordinates[0], f.geometry.coordinates[1]);
       return turf.point(coordsWGS84, f.properties);
@@ -115,16 +173,26 @@
 
     eessGeoJSON = turf.featureCollection(featuresConvertidos);
 
-    // Dibujar los Establecimientos en el mapa
+    // 4. Cargar capa en el mapa con simbología por tipo de atención
     L.geoJSON(eessGeoJSON, {
+      pointToLayer: function (feature, latlng) {
+        const tipo = feature.properties.tipo_atencion;
+        if (tipo === "UVICLIN") return L.marker(latlng, { icon: iconUviclin });
+        if (tipo === "UNIDAD FEBRIL") return L.marker(latlng, { icon: iconFebril });
+        return L.marker(latlng, { icon: iconDefault });
+      },
       onEachFeature: (feature, layer) => {
         const p = feature.properties;
+        let badgeClass = 'badge badge-default';
+        if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
+        if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
+
         const popupContent = `
           <div class="popup-eess">
-            <b>${p.NOM_EESS_RECOR}</b> <span class="badge">${p.Categoria}</span><br>
+            <b>${p.NOM_EESS_RECOR}</b><br>
+            <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria}</span><br>
             <b>Distrito:</b> ${p.Distrito}<br>
             <b>Dirección:</b> ${p.DIRECCION}<br>
-            <b>Atención:</b> ${p.tipo_atencion || 'N/A'}<br>
             <b>Camas Disponibles:</b> ${p.camas_disponibles || 0}<br>
             <b>Camillas Disponibles:</b> ${p.camillas_disponibles || 0}
           </div>
@@ -133,10 +201,10 @@
       }
     }).addTo(map);
 
-    // 3. Capturar ubicación GPS
+    // 5. Geolocalización por GPS
     function obtenerUbicacionGPS() {
       if (!navigator.geolocation) {
-        alert("Geolocalización no soportada.");
+        alert("Tu dispositivo o navegador no soporta geolocalización por GPS.");
         return;
       }
 
@@ -150,20 +218,22 @@
           userMarker = L.marker([userLat, userLng], {
             icon: L.divIcon({
               className: 'user-icon',
-              html: '<div style="background-color:#d9534f; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 6px rgba(0,0,0,0.4);"></div>'
+              html: '<div style="background-color:#d9534f; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 6px rgba(0,0,0,0.5);"></div>'
             })
           }).addTo(map).bindPopup("<b>Tu Ubicación Actual</b>").openPopup();
 
           map.setView([userLat, userLng], 14);
 
-          calcularRutaEESSMasCercano(userLngLat);
+          if (eessGeoJSON) {
+            calcularRutaEESSMasCercano(userLngLat);
+          }
         },
         (error) => alert("Error al obtener GPS: " + error.message),
         { enableHighAccuracy: true }
       );
     }
 
-    // 4. Calcular el más cercano y solicitar ruta por carretera a OSRM
+    // 6. Cálculo de EESS más cercano y trazo de ruta con OSRM
     function calcularRutaEESSMasCercano(userLngLat) {
       const origenTurf = turf.point(userLngLat);
       const masCercano = turf.nearestPoint(origenTurf, eessGeoJSON);
@@ -184,12 +254,16 @@
 
             rutaLayer = L.geoJSON(geometry, { style: { color: '#0055ff', weight: 6, opacity: 0.85 } }).addTo(map);
 
+            let badgeClass = 'badge badge-default';
+            if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
+            if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
+
             L.popup()
               .setLatLng([destinoCoords[1], destinoCoords[0]])
               .setContent(`
                 <div class="popup-eess">
                   <b>EESS Más Cercano:</b> ${p.NOM_EESS_RECOR}<br>
-                  <b>Categoría:</b> ${p.Categoria}<br>
+                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria}</span><br>
                   <b>Dirección:</b> ${p.DIRECCION}<hr>
                   <b>Distancia vial:</b> ${distanciaKm} km<br>
                   <b>Tiempo estimado:</b> ${duracionMin} minutos
