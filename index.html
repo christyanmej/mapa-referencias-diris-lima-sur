@@ -12,7 +12,7 @@
     body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     #map { width: 100vw; height: 100vh; }
     
-    /* Estilos ultra compactos para las etiquetas de los EESS */
+    /* Etiquetas para EESS */
     .label-eess {
       background: rgba(255, 255, 255, 0.92) !important;
       border: 1px solid #0056b3 !important;
@@ -28,10 +28,9 @@
       text-align: center !important;
       word-wrap: break-word !important;
     }
-
     .label-eess-hidden { display: none !important; }
 
-    /* Panel de controles superiores derechos */
+    /* Panel de controles */
     .controls-container {
       position: absolute;
       top: 15px;
@@ -61,8 +60,6 @@
     .btn-control:active { transform: scale(0.98); }
     .btn-toggle-labels { background: #6c757d; }
     .btn-toggle-labels.active { background: #28a745; }
-    .btn-add { background: #17a2b8; }
-    .btn-download { background: #28a745; display: none; }
 
     .select-tipo {
       background: white;
@@ -78,15 +75,15 @@
       width: 100%;
     }
 
-    /* Estilos para Popups y Formularios */
-    .popup-eess { font-size: 13px; line-height: 1.5; color: #333; }
+    /* Popups y Formularios */
+    .popup-eess { font-size: 12px; line-height: 1.4; color: #333; }
     .popup-eess b { color: #0056b3; }
     .btn-edit-popup {
       margin-top: 8px;
       background: #ffc107;
       color: #212529;
       border: none;
-      padding: 5px 10px;
+      padding: 6px 10px;
       border-radius: 4px;
       font-weight: bold;
       font-size: 11px;
@@ -107,7 +104,7 @@
     .badge-febril { background-color: #11bf87; }
     .badge-default { background-color: #6c757d; }
 
-    /* Modal emergente de Edición / Registro */
+    /* Modal de Edición */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
@@ -119,19 +116,25 @@
     }
     .modal-content {
       background: white;
-      padding: 20px;
+      padding: 18px;
       border-radius: 8px;
-      width: 320px;
-      max-width: 90%;
+      width: 380px;
+      max-width: 92%;
+      max-height: 85vh;
+      overflow-y: auto;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-    .modal-content h3 { margin-top: 0; color: #0056b3; font-size: 16px; }
-    .form-group { margin-bottom: 10px; }
-    .form-group label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 2px; }
-    .form-group input, .form-group select {
-      width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 12px;
+    .modal-content h3 { margin-top: 0; color: #0056b3; font-size: 15px; border-bottom: 2px solid #0056b3; padding-bottom: 5px; }
+    .form-group { margin-bottom: 8px; }
+    .form-group label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 2px; color: #444; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 11px;
     }
-    .modal-buttons { display: flex; gap: 8px; margin-top: 15px; }
+    .form-group input[readonly] { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
+    .form-row { display: flex; gap: 8px; }
+    .form-row .form-group { flex: 1; }
+    
+    .modal-buttons { display: flex; gap: 8px; margin-top: 12px; }
     .btn-save { background: #28a745; color: white; border: none; padding: 8px; border-radius: 4px; flex: 1; font-weight: bold; cursor: pointer; }
     .btn-cancel { background: #dc3545; color: white; border: none; padding: 8px; border-radius: 4px; flex: 1; font-weight: bold; cursor: pointer; }
 
@@ -164,8 +167,6 @@
       <option value="UVICLIN">🏥 Solo UVICLIN</option>
       <option value="UNIDAD FEBRIL">🌡️ Solo UNIDAD FEBRIL</option>
     </select>
-    <button class="btn-control btn-add" onclick="activarModoAgregarEESS()">➕ Registrar Nuevo EESS</button>
-    <button id="btnDownloadGeoJSON" class="btn-control btn-download" onclick="descargarGeoJSONActualizado()">💾 Descargar GeoJSON</button>
   </div>
 
   <!-- Leyenda del Mapa -->
@@ -175,49 +176,124 @@
     <div class="legend-item"><img src="unidad febril.png" alt="UNIDAD FEBRIL" onerror="this.src='https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png'"> UNIDAD FEBRIL</div>
   </div>
 
-  <!-- Modal para Formulario de Registro/Edición -->
+  <!-- Modal para Formulario de Edición -->
   <div id="modalEESS" class="modal-overlay">
     <div class="modal-content">
-      <h3 id="modalTitulo">Editar Establecimiento</h3>
+      <h3>Editar Establecimiento</h3>
       <form id="formEESS" onsubmit="guardarFormularioEESS(event)">
-        <input type="hidden" id="editObjectId">
-        <input type="hidden" id="editLat">
-        <input type="hidden" id="editLng">
+        <!-- Campos fijos no editables -->
+        <input type="hidden" id="editId">
+        <div class="form-group">
+          <label>Establecimiento (No editable):</label>
+          <input type="text" id="editNombre" readonly>
+        </div>
         
-        <div class="form-group">
-          <label>Nombre del EESS:</label>
-          <input type="text" id="editNombre" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tipo Atención:</label>
+            <select id="editTipoAtencion">
+              <option value="UVICLIN">UVICLIN</option>
+              <option value="UNIDAD FEBRIL">UNIDAD FEBRIL</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Estado:</label>
+            <select id="editEstado">
+              <option value="ACTIVO">ACTIVO</option>
+              <option value="INACTIVO">INACTIVO</option>
+            </select>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Tipo de Atención:</label>
-          <select id="editTipoAtencion">
-            <option value="UVICLIN">UVICLIN</option>
-            <option value="UNIDAD FEBRIL">UNIDAD FEBRIL</option>
-          </select>
+
+        <!-- Camas -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Camas Ocupadas:</label>
+            <input type="number" id="editCamasOcup" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camas Disponibles:</label>
+            <input type="number" id="editCamasDisp" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camas Mosquiteros:</label>
+            <input type="number" id="editCamasMosq" min="0">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Distrito:</label>
-          <input type="text" id="editDistrito" required>
+
+        <!-- Camillas -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Camillas Ocupadas:</label>
+            <input type="number" id="editCamillasOcup" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camillas Disponibles:</label>
+            <input type="number" id="editCamillasDisp" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camillas Mosquiteros:</label>
+            <input type="number" id="editCamillasMosq" min="0">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Categoría:</label>
-          <input type="text" id="editCategoria" placeholder="I-3, I-4, etc.">
+
+        <!-- Contacto y Datos Administrativos -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Teléfono EESS:</label>
+            <input type="text" id="editTelEESS">
+          </div>
+          <div class="form-group">
+            <label>Jefe del EESS:</label>
+            <input type="text" id="editJefeEESS">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Dirección:</label>
-          <input type="text" id="editDireccion">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Teléfono Jefe:</label>
+            <input type="text" id="editTelJefe">
+          </div>
+          <div class="form-group">
+            <label>Correo EESS:</label>
+            <input type="email" id="editCorreoEESS">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Camas Disponibles:</label>
-          <input type="number" id="editCamas" value="0" min="0">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Horario UVI:</label>
+            <input type="text" id="editHorarioUVI">
+          </div>
+          <div class="form-group">
+            <label>Días Atención:</label>
+            <input type="text" id="editDiasAtencion">
+          </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Brigadas:</label>
+            <input type="text" id="editBrigadas">
+          </div>
+          <div class="form-group">
+            <label>Recurso Humano:</label>
+            <input type="text" id="editRRHH">
+          </div>
+        </div>
+
         <div class="form-group">
-          <label>Camillas Disponibles:</label>
-          <input type="number" id="editCamillas" value="0" min="0">
+          <label>Espacio Adicional Camas:</label>
+          <input type="text" id="editEspacioCamas">
+        </div>
+
+        <div class="form-group">
+          <label>Observaciones:</label>
+          <textarea id="editObservacion" rows="2"></textarea>
         </div>
         
         <div class="modal-buttons">
-          <button type="submit" class="btn-save">Guardar</button>
+          <button type="submit" id="btnGuardarModal" class="btn-save">Guardar Cambios</button>
           <button type="button" class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
         </div>
       </form>
@@ -227,6 +303,9 @@
   <div id="map"></div>
 
   <script>
+    // URL del Google Apps Script desplegado
+    const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbyz5KzvSzG_bMZauYnd_bc5TkqzCdsad5m9pax2V19YhdY4PL7nmVLKvQwkvX0lrgyM/exec";
+
     // 1. Configuración de mapa base
     const map = L.map('map').setView([-12.203, -76.973], 12);
 
@@ -239,7 +318,6 @@
     let geojsonLayer = null;     // Capa gráfica Leaflet
     let userMarker = null;
     let rutaLayer = null;
-    let modoAgregarActivo = false;
     let etiquetasVisibles = false;
 
     // Iconos personalizados
@@ -261,46 +339,29 @@
       iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
     });
 
-    // Funciones matemáticas de proyección (EPSG:3857 a EPSG:4326)
-    function webMercatorToWGS84(x, y) {
-      const lng = (x / 6378137.0) * (180 / Math.PI);
-      const lat = (Math.atan(Math.exp(y / 6378137.0)) - (Math.PI / 4)) * 2 * (180 / Math.PI);
-      return [lng, lat];
-    }
+    // 2. Cargar dinámicamente desde Google Sheets a través del Apps Script
+    cargarDatosDesdeSheets();
 
-    function wgs84ToWebMercator(lng, lat) {
-      const x = lng * 20037508.34 / 180;
-      let y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180);
-      y = y * 20037508.34 / 180;
-      return [x, y];
-    }
+    function cargarDatosDesdeSheets() {
+      fetch(URL_WEB_APP)
+        .then(res => res.json())
+        .then(dataRows => {
+          const features = dataRows.map(row => {
+            const lat = parseFloat(row.Y || 0);
+            const lng = parseFloat(row.X || 0);
+            return turf.point([lng, lat], row);
+          });
 
-    // 2. Cargar dinámicamente desde el archivo establecimientos.geojson
-    fetch('./establecimientos.geojson')
-      .then(res => {
-        if (!res.ok) throw new Error("No se pudo leer establecimientos.geojson");
-        return res.json();
-      })
-      .then(data => {
-        // Normalizar geometrías a EPSG:4326 WGS84 para Turf.js y Leaflet
-        const featuresConvertidos = data.features.map(f => {
-          let coords = f.geometry.coordinates;
-          // Si las coordenadas están en Web Mercator (-8500000 aprox), convertimos
-          if (Math.abs(coords[0]) > 180) {
-            coords = webMercatorToWGS84(coords[0], coords[1]);
-          }
-          return turf.point(coords, f.properties);
+          eessGeoJSON = turf.featureCollection(features);
+          renderizarMapa("TODOS");
+        })
+        .catch(err => {
+          console.error("Error al cargar datos desde Google Sheets:", err);
+          alert("Atención: No se pudo conectar con Google Sheets. Revisa la URL del Apps Script.");
         });
+    }
 
-        eessGeoJSON = turf.featureCollection(featuresConvertidos);
-        renderizarMapa("TODOS");
-      })
-      .catch(err => {
-        console.error("Error al cargar el GeoJSON:", err);
-        alert("Atención: Asegúrate de tener el archivo 'establecimientos.geojson' en la raíz de tu repositorio.");
-      });
-
-    // 3. Renderizar Capa en Mapa
+    // 3. Renderizar Capa en el Mapa
     function renderizarMapa(filtroTipo = "TODOS") {
       if (geojsonLayer) map.removeLayer(geojsonLayer);
       if (!eessGeoJSON) return;
@@ -325,19 +386,20 @@
           if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
           if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
 
-          layer.bindTooltip(p.NOM_EESS_RECOR || p.NOMBRE, {
+          layer.bindTooltip(p.eess || p.NOM_EESS_RECOR || '', {
             permanent: true, direction: 'bottom', offset: [0, 8], className: labelClass
           });
 
           const popupContent = `
             <div class="popup-eess">
-              <b>${p.NOM_EESS_RECOR}</b><br>
-              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria || 'N/A'}</span><br>
-              <b>Distrito:</b> ${p.Distrito || ''}<br>
-              <b>Dirección:</b> ${p.DIRECCION || ''}<br>
-              <b>Camas Disponibles:</b> ${p.camas_disponibles || 0}<br>
-              <b>Camillas Disponibles:</b> ${p.camillas_disponibles || 0}<br>
-              <button class="btn-edit-popup" onclick="abrirModalEditar(${p.OBJECTID})">✏️ Editar Datos</button>
+              <b>${p.eess}</b><br>
+              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span><br>
+              <b>RIS:</b> ${p.ris || ''}<br>
+              <b>Camas Totales:</b> ${p.camas_totales || 0} (Ocup: ${p.camas_ocupadas || 0} / Disp: ${p.camas_disponibles || 0})<br>
+              <b>Camillas Totales:</b> ${p.camillas_totales || 0} (Ocup: ${p.camillas_ocupadas || 0} / Disp: ${p.camillas_disponibles || 0})<br>
+              <b>Teléfono:</b> ${p.telefono_eess || 'N/A'}<br>
+              <b>Jefe EESS:</b> ${p.jefe_eess || 'N/A'}<br>
+              <button class="btn-edit-popup" onclick="abrirModalEditar('${p.Id}')">✏️ Editar Datos</button>
             </div>
           `;
           layer.bindPopup(popupContent);
@@ -345,125 +407,94 @@
       }).addTo(map);
     }
 
-    // 4. Modal y Sistema de Registro/Edición
-    function abrirModalEditar(objectId) {
-      const feature = eessGeoJSON.features.find(f => f.properties.OBJECTID === objectId);
+    // 4. Modal y Edición
+    function abrirModalEditar(idRegistro) {
+      const feature = eessGeoJSON.features.find(f => f.properties.Id == idRegistro);
       if (!feature) return;
 
       const p = feature.properties;
-      document.getElementById('modalTitulo').innerText = "Editar Establecimiento";
-      document.getElementById('editObjectId').value = p.OBJECTID;
-      document.getElementById('editNombre').value = p.NOM_EESS_RECOR || '';
+      document.getElementById('editId').value = p.Id;
+      document.getElementById('editNombre').value = p.eess || '';
       document.getElementById('editTipoAtencion').value = p.tipo_atencion || 'UVICLIN';
-      document.getElementById('editDistrito').value = p.Distrito || '';
-      document.getElementById('editCategoria').value = p.Categoria || '';
-      document.getElementById('editDireccion').value = p.DIRECCION || '';
-      document.getElementById('editCamas').value = p.camas_disponibles || 0;
-      document.getElementById('editCamillas').value = p.camillas_disponibles || 0;
+      document.getElementById('editEstado').value = p.estado_uviclin || 'ACTIVO';
+      
+      document.getElementById('editCamasOcup').value = p.camas_ocupadas || 0;
+      document.getElementById('editCamasDisp').value = p.camas_disponibles || 0;
+      document.getElementById('editCamasMosq').value = p.camas_mosquiteros || 0;
+
+      document.getElementById('editCamillasOcup').value = p.camillas_ocupadas || 0;
+      document.getElementById('editCamillasDisp').value = p.camillas_disponibles || 0;
+      document.getElementById('editCamillasMosq').value = p.camillas_mosquiteros || 0;
+
+      document.getElementById('editTelEESS').value = p.telefono_eess || '';
+      document.getElementById('editJefeEESS').value = p.jefe_eess || '';
+      document.getElementById('editTelJefe').value = p.telefono_jefe_eess || '';
+      document.getElementById('editCorreoEESS').value = p.correo_eess || '';
+      document.getElementById('editHorarioUVI').value = p.horario_uvi || '';
+      document.getElementById('editDiasAtencion').value = p.dias_atencion || '';
+      document.getElementById('editBrigadas').value = p.brigadas || '';
+      document.getElementById('editRRHH').value = p.rrhh || '';
+      document.getElementById('editEspacioCamas').value = p.espacio_camas || '';
+      document.getElementById('editObservacion').value = p.observación || '';
 
       document.getElementById('modalEESS').style.display = 'flex';
     }
 
-    function activarModoAgregarEESS() {
-      modoAgregarActivo = true;
-      alert("Haz clic sobre el mapa en el lugar exacto donde se ubica el nuevo establecimiento.");
-      map.once('click', (e) => {
-        const { lat, lng } = e.latlng;
-        document.getElementById('modalTitulo').innerText = "Registrar Nuevo EESS";
-        document.getElementById('editObjectId').value = ""; // Vacío representa nuevo
-        document.getElementById('editLat').value = lat;
-        document.getElementById('editLng').value = lng;
-        
-        document.getElementById('editNombre').value = "";
-        document.getElementById('editTipoAtencion').value = "UVICLIN";
-        document.getElementById('editDistrito').value = "VILLA EL SALVADOR";
-        document.getElementById('editCategoria').value = "I-3";
-        document.getElementById('editDireccion').value = "";
-        document.getElementById('editCamas').value = 0;
-        document.getElementById('editCamillas').value = 0;
-
-        document.getElementById('modalEESS').style.display = 'flex';
-        modoAgregarActivo = false;
-      });
-    }
-
     function guardarFormularioEESS(event) {
       event.preventDefault();
-      const objectId = document.getElementById('editObjectId').value;
+      const idRegistro = document.getElementById('editId').value;
+      const btnGuardar = document.getElementById('btnGuardarModal');
 
-      if (objectId) {
-        // Modo Edición
-        const feature = eessGeoJSON.features.find(f => f.properties.OBJECTID == objectId);
-        if (feature) {
-          feature.properties.NOM_EESS_RECOR = document.getElementById('editNombre').value;
-          feature.properties.tipo_atencion = document.getElementById('editTipoAtencion').value;
-          feature.properties.Distrito = document.getElementById('editDistrito').value;
-          feature.properties.Categoria = document.getElementById('editCategoria').value;
-          feature.properties.DIRECCION = document.getElementById('editDireccion').value;
-          feature.properties.camas_disponibles = parseInt(document.getElementById('editCamas').value) || 0;
-          feature.properties.camillas_disponibles = parseInt(document.getElementById('editCamillas').value) || 0;
-        }
-      } else {
-        // Modo Nuevo Registro
-        const lat = parseFloat(document.getElementById('editLat').value);
-        const lng = parseFloat(document.getElementById('editLng').value);
-        const nuevoId = Date.now(); // ID único genérico
+      const payload = {
+        Id: idRegistro,
+        tipo_atencion: document.getElementById('editTipoAtencion').value,
+        estado_uviclin: document.getElementById('editEstado').value,
+        camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
+        camas_disponibles: parseInt(document.getElementById('editCamasDisp').value) || 0,
+        camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value) || 0,
+        camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
+        camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
+        camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
+        telefono_eess: document.getElementById('editTelEESS').value,
+        jefe_eess: document.getElementById('editJefeEESS').value,
+        telefono_jefe_eess: document.getElementById('editTelJefe').value,
+        correo_eess: document.getElementById('editCorreoEESS').value,
+        horario_uvi: document.getElementById('editHorarioUVI').value,
+        dias_atencion: document.getElementById('editDiasAtencion').value,
+        brigadas: document.getElementById('editBrigadas').value,
+        rrhh: document.getElementById('editRRHH').value,
+        espacio_camas: document.getElementById('editEspacioCamas').value,
+        observación: document.getElementById('editObservacion').value
+      };
 
-        const nuevoFeature = turf.point([lng, lat], {
-          OBJECTID: nuevoId,
-          NOM_EESS_RECOR: document.getElementById('editNombre').value,
-          tipo_atencion: document.getElementById('editTipoAtencion').value,
-          Distrito: document.getElementById('editDistrito').value,
-          Categoria: document.getElementById('editCategoria').value,
-          DIRECCION: document.getElementById('editDireccion').value,
-          camas_disponibles: parseInt(document.getElementById('editCamas').value) || 0,
-          camillas_disponibles: parseInt(document.getElementById('editCamillas').value) || 0
-        });
+      btnGuardar.innerText = "Guardando...";
+      btnGuardar.disabled = true;
 
-        eessGeoJSON.features.push(nuevoFeature);
-      }
-
-      cerrarModal();
-      filtrarPorTipoAtencion();
-      
-      // Mostrar botón de descarga para salvar los cambios al GeoJSON
-      document.getElementById('btnDownloadGeoJSON').style.display = 'block';
+      fetch(URL_WEB_APP, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        alert("¡Cambios guardados con éxito en Google Sheets!");
+        cerrarModal();
+        cargarDatosDesdeSheets(); // Recargar datos para refrescar la vista
+      })
+      .catch(err => {
+        alert("Error al intentar guardar: " + err);
+      })
+      .finally(() => {
+        btnGuardar.innerText = "Guardar Cambios";
+        btnGuardar.disabled = false;
+      });
     }
 
     function cerrarModal() {
       document.getElementById('modalEESS').style.display = 'none';
     }
 
-    // 5. Función para exportar/descargar el GeoJSON actualizado
-    function descargarGeoJSONActualizado() {
-      // Re-proyectar de vuelta a EPSG:3857 si se desea mantener la compatibilidad original con GIS
-      const exportFeatures = eessGeoJSON.features.map(f => {
-        const [lng, lat] = f.geometry.coordinates;
-        const [x, y] = wgs84ToWebMercator(lng, lat);
-        return {
-          type: "Feature",
-          id: f.properties.OBJECTID,
-          geometry: { type: "Point", coordinates: [x, y] },
-          properties: f.properties
-        };
-      });
-
-      const exportGeoJSON = {
-        type: "FeatureCollection",
-        crs: { type: "name", properties: { name: "EPSG:3857" } },
-        features: exportFeatures
-      };
-
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportGeoJSON, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", "establecimientos.geojson");
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-    }
-
-    // 6. Controles Auxiliares
+    // 5. Controles Auxiliares
     function toggleEtiquetas() {
       etiquetasVisibles = !etiquetasVisibles;
       const btn = document.getElementById('btnToggleLabels');
@@ -486,7 +517,7 @@
       renderizarMapa(valorSeleccionado);
     }
 
-    // 7. GPS y Ruteo OSRM
+    // 6. GPS y Ruteo OSRM
     function obtenerUbicacionGPS() {
       if (!navigator.geolocation) {
         alert("Tu navegador no soporta geolocalización por GPS.");
@@ -559,9 +590,9 @@
               .setLatLng([destinoCoords[1], destinoCoords[0]])
               .setContent(`
                 <div class="popup-eess">
-                  <b>EESS Más Cercano (${filtroActual}):</b> ${p.NOM_EESS_RECOR}<br>
-                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria || 'N/A'}</span><br>
-                  <b>Dirección:</b> ${p.DIRECCION || ''}<hr>
+                  <b>EESS Más Cercano (${filtroActual}):</b> ${p.eess}<br>
+                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span><br>
+                  <b>RIS:</b> ${p.ris || ''}<hr>
                   <b>Distancia vial:</b> ${distanciaKm} km<br>
                   <b>Tiempo estimado:</b> ${duracionMin} minutos
                 </div>
