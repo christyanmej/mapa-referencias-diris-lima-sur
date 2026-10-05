@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Buscador de EESS y Rutas - DIRIS Lima Sur</title>
+  <title>Buscador y Editor de EESS - DIRIS Lima Sur</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Turf.js para análisis espacial -->
@@ -19,22 +19,17 @@
       border-radius: 3px !important;
       color: #111 !important;
       font-weight: 600 !important;
-      font-size: 8.5px !important;          /* Tamaño de fuente más pequeño */
-      line-height: 1.1 !important;           /* Menor espacio entre líneas */
-      padding: 1px 3px !important;           /* Relleno interno muy estrecho */
+      font-size: 8.5px !important;
+      line-height: 1.1 !important;
+      padding: 1px 3px !important;
       box-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
-      
-      /* Control para hacer el recuadro estrecho */
-      max-width: 85px !important;            /* Ancho máximo ajustado */
-      white-space: normal !important;        /* Permite que el texto baje de línea */
-      text-align: center !important;         /* Texto centrado dentro del recuadro */
+      max-width: 85px !important;
+      white-space: normal !important;
+      text-align: center !important;
       word-wrap: break-word !important;
     }
 
-    /* Clase para ocultar etiquetas cuando están inactivas */
-    .label-eess-hidden {
-      display: none !important;
-    }
+    .label-eess-hidden { display: none !important; }
 
     /* Panel de controles superiores derechos */
     .controls-container {
@@ -48,40 +43,27 @@
       align-items: flex-end;
     }
     
-    /* Botón flotante para GPS */
-    .btn-gps {
+    .btn-control {
       background: #007bff;
       color: white;
       border: none;
-      padding: 10px 16px;
+      padding: 9px 14px;
       border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
-      font-size: 13px;
+      font-size: 12px;
       box-shadow: 0 3px 6px rgba(0,0,0,0.3);
       transition: background 0.2s, transform 0.1s;
       width: 100%;
+      text-align: center;
     }
-    .btn-gps:hover { background: #0056b3; }
-    .btn-gps:active { transform: scale(0.98); }
-
-    /* Botón para alternar etiquetas */
-    .btn-toggle-labels {
-      background: #6c757d;
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 12px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
-      transition: background 0.2s;
-      width: 100%;
-    }
+    .btn-control:hover { background: #0056b3; }
+    .btn-control:active { transform: scale(0.98); }
+    .btn-toggle-labels { background: #6c757d; }
     .btn-toggle-labels.active { background: #28a745; }
+    .btn-add { background: #17a2b8; }
+    .btn-download { background: #28a745; display: none; }
 
-    /* Filtro de Selección */
     .select-tipo {
       background: white;
       border: 1px solid #ccc;
@@ -96,9 +78,22 @@
       width: 100%;
     }
 
-    /* Estilos para el Popup */
+    /* Estilos para Popups y Formularios */
     .popup-eess { font-size: 13px; line-height: 1.5; color: #333; }
     .popup-eess b { color: #0056b3; }
+    .btn-edit-popup {
+      margin-top: 8px;
+      background: #ffc107;
+      color: #212529;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 11px;
+      cursor: pointer;
+      width: 100%;
+    }
+
     .badge {
       display: inline-block;
       padding: 3px 8px;
@@ -112,7 +107,35 @@
     .badge-febril { background-color: #11bf87; }
     .badge-default { background-color: #6c757d; }
 
-    /* Leyenda flotante en el mapa */
+    /* Modal emergente de Edición / Registro */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 320px;
+      max-width: 90%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .modal-content h3 { margin-top: 0; color: #0056b3; font-size: 16px; }
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 2px; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 12px;
+    }
+    .modal-buttons { display: flex; gap: 8px; margin-top: 15px; }
+    .btn-save { background: #28a745; color: white; border: none; padding: 8px; border-radius: 4px; flex: 1; font-weight: bold; cursor: pointer; }
+    .btn-cancel { background: #dc3545; color: white; border: none; padding: 8px; border-radius: 4px; flex: 1; font-weight: bold; cursor: pointer; }
+
+    /* Leyenda */
     .legend {
       position: absolute;
       bottom: 25px;
@@ -134,13 +157,15 @@
 
   <!-- Contenedor de Controles Flotantes -->
   <div class="controls-container">
-    <button class="btn-gps" onclick="obtenerUbicacionGPS()">📍 Mi Ubicación GPS</button>
-    <button id="btnToggleLabels" class="btn-toggle-labels" onclick="toggleEtiquetas()">🏷️ Etiquetas: OFF</button>
+    <button class="btn-control" onclick="obtenerUbicacionGPS()">📍 Mi Ubicación GPS</button>
+    <button id="btnToggleLabels" class="btn-control btn-toggle-labels" onclick="toggleEtiquetas()">🏷️ Etiquetas: OFF</button>
     <select id="selectTipoAtencion" class="select-tipo" onchange="filtrarPorTipoAtencion()">
       <option value="TODOS">🔍 Mostrar Todos los EESS</option>
       <option value="UVICLIN">🏥 Solo UVICLIN</option>
       <option value="UNIDAD FEBRIL">🌡️ Solo UNIDAD FEBRIL</option>
     </select>
+    <button class="btn-control btn-add" onclick="activarModoAgregarEESS()">➕ Registrar Nuevo EESS</button>
+    <button id="btnDownloadGeoJSON" class="btn-control btn-download" onclick="descargarGeoJSONActualizado()">💾 Descargar GeoJSON</button>
   </div>
 
   <!-- Leyenda del Mapa -->
@@ -150,51 +175,59 @@
     <div class="legend-item"><img src="unidad febril.png" alt="UNIDAD FEBRIL" onerror="this.src='https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png'"> UNIDAD FEBRIL</div>
   </div>
 
+  <!-- Modal para Formulario de Registro/Edición -->
+  <div id="modalEESS" class="modal-overlay">
+    <div class="modal-content">
+      <h3 id="modalTitulo">Editar Establecimiento</h3>
+      <form id="formEESS" onsubmit="guardarFormularioEESS(event)">
+        <input type="hidden" id="editObjectId">
+        <input type="hidden" id="editLat">
+        <input type="hidden" id="editLng">
+        
+        <div class="form-group">
+          <label>Nombre del EESS:</label>
+          <input type="text" id="editNombre" required>
+        </div>
+        <div class="form-group">
+          <label>Tipo de Atención:</label>
+          <select id="editTipoAtencion">
+            <option value="UVICLIN">UVICLIN</option>
+            <option value="UNIDAD FEBRIL">UNIDAD FEBRIL</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Distrito:</label>
+          <input type="text" id="editDistrito" required>
+        </div>
+        <div class="form-group">
+          <label>Categoría:</label>
+          <input type="text" id="editCategoria" placeholder="I-3, I-4, etc.">
+        </div>
+        <div class="form-group">
+          <label>Dirección:</label>
+          <input type="text" id="editDireccion">
+        </div>
+        <div class="form-group">
+          <label>Camas Disponibles:</label>
+          <input type="number" id="editCamas" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Camillas Disponibles:</label>
+          <input type="number" id="editCamillas" value="0" min="0">
+        </div>
+        
+        <div class="modal-buttons">
+          <button type="submit" class="btn-save">Guardar</button>
+          <button type="button" class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="map"></div>
 
   <script>
-    // 1. Datos GeoJSON integrados (DIRIS Lima Sur)
-    const rawData = {
-      "type": "FeatureCollection",
-      "crs": { "type": "name", "properties": { "name": "EPSG:3857" } },
-      "features": [
-        {"type":"Feature","id":2,"geometry":{"type":"Point","coordinates":[-8572168.1085999999,-1367172.883200001]},"properties":{"OBJECTID":2,"Código_Único":"00005998","Distrito":"CHORRILLOS","Categoria":"I-4","POINT_Y":-12.188538799999947,"DIRECCION":"Av. buenos aires de villa s/n, Chorrillos","NOM_EESS_RECOR":"C.M.I. BUENOS AIRES DE VILLA","AMBULANCIAS":null,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":1,"camas_ocupadas":0,"camas_disponibles":1,"porc_ocupacion":0,"camas_mosquiteros":1,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":null}},
-        {"type":"Feature","id":6,"geometry":{"type":"Point","coordinates":[-8557077.3189000003,-1376702.8053000011]},"properties":{"OBJECTID":6,"Código_Único":"00036447","Distrito":"LURIN","Categoria":"I-4","POINT_Y":-12.272204539999962,"DIRECCION":"JIRÓN BOLIVAR NUMERO 206, LURÍN","NOM_EESS_RECOR":"C.M.I. LURIN","AMBULANCIAS":null,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":2,"camas_ocupadas":0,"camas_disponibles":2,"porc_ocupacion":0,"camas_mosquiteros":2,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":null}},
-        {"type":"Feature","id":8,"geometry":{"type":"Point","coordinates":[-8557651.7107999995,-1373457.8326999992]},"properties":{"OBJECTID":8,"Código_Único":"00006093","Distrito":"LURIN","Categoria":"I-3","POINT_Y":-12.243719029999966,"DIRECCION":"Jr. huanuco s/n centro poblado rural casica-villa libertad-pachacamac","NOM_EESS_RECOR":"C.S. CLAS VILLA LIBERTAD","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":9,"geometry":{"type":"Point","coordinates":[-8560742.9473000001,-1372357.6691000015]},"properties":{"OBJECTID":9,"Código_Único":"00016852","Distrito":"LURIN","Categoria":"I-2","POINT_Y":-12.234060709999937,"DIRECCION":"Av. Los Cipreces mz b , lote 01 , martha milagros baja, lurin","NOM_EESS_RECOR":"P.S. MARTHA MILAGROS BAJA","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":12,"geometry":{"type":"Point","coordinates":[-8563504.6358000003,-1367505.5709000006]},"properties":{"OBJECTID":12,"Código_Único":"00006164","Distrito":"VILLA MARIA DEL TRIUNFO","Categoria":"I-4","POINT_Y":-12.19145999999995,"DIRECCION":"ASv. republica y billingurst s/n 2do sector, VMT","NOM_EESS_RECOR":"C.M.I. TABLADA DE LURIN","AMBULANCIAS":14,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":9,"camas_ocupadas":0,"camas_disponibles":9,"porc_ocupacion":0,"camas_mosquiteros":12,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":15,"geometry":{"type":"Point","coordinates":[-8569566.0556000005,-1362619.0447000004]},"properties":{"OBJECTID":15,"Código_Único":"00006109","Distrito":"SAN JUAN DE MIRAFLORES","Categoria":"I-3","POINT_Y":-12.148550099999966,"DIRECCION":"P.J. jesus poderoso lote c mz t s/n pamplona baja, SJM","NOM_EESS_RECOR":"C.S. JESUS PODEROSO","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":1,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":16,"geometry":{"type":"Point","coordinates":[-8568124.0774000008,-1363097.7151000015]},"properties":{"OBJECTID":16,"Código_Único":"00006104","Distrito":"SAN JUAN DE MIRAFLORES","Categoria":"I-4","POINT_Y":-12.15275373999998,"DIRECCION":"Jr. Manuel barreto s/n, cdra. 2, zona k, ciudad de dios, san juan de miraflores","NOM_EESS_RECOR":"C.M.I. MANUEL BARRETO","AMBULANCIAS":6,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":6,"camillas_ocupadas":0,"camillas_disponibles":6,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":29,"geometry":{"type":"Point","coordinates":[-8564456.5343999993,-1363564.9956]},"properties":{"OBJECTID":29,"Código_Único":"00006151","Distrito":"VILLA MARIA DEL TRIUNFO","Categoria":"I-4","POINT_Y":-12.156857289999948,"DIRECCION":"Av. Pedro valle s/n (altura cuadra 18 av.el triunfo, VMT","NOM_EESS_RECOR":"C.M.I. VILLA MARIA DEL TRIUNFO","AMBULANCIAS":12,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":null}},
-        {"type":"Feature","id":34,"geometry":{"type":"Point","coordinates":[-8567791.5928000007,-1365934.1651000008]},"properties":{"OBJECTID":34,"Código_Único":"00006122","Distrito":"SAN JUAN DE MIRAFLORES","Categoria":"I-3","POINT_Y":-12.177661819999969,"DIRECCION":"Av. Miguel Grau mz. l, lote. 15 - alt. cdra 9 Av. prolong. Canevaro aahh trébol azul, SJM","NOM_EESS_RECOR":"C.S. TREBOL AZUL","AMBULANCIAS":7,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":null}},
-        {"type":"Feature","id":45,"geometry":{"type":"Point","coordinates":[-8556287.2744999994,-1358173.622200001]},"properties":{"OBJECTID":45,"Código_Único":"00015075","Distrito":"PACHACAMAC","Categoria":"I-3","POINT_Y":-12.109507639999947,"DIRECCION":"manzana k8 lote 5b, sector los jardines huertos de manchay, pachacamac","NOM_EESS_RECOR":"C.S. CLAS JUAN PABLO II","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":null}},
-        {"type":"Feature","id":47,"geometry":{"type":"Point","coordinates":[-8543872.2191000003,-1399237.3095000014]},"properties":{"OBJECTID":47,"Código_Único":"00006085","Distrito":"PUCUSANA","Categoria":"I-3","POINT_Y":-12.469934999999964,"DIRECCION":"A.H. benjamin doig lossio mz 21 lt 13, Pucusana","NOM_EESS_RECOR":"C.S. BENJAMIN DOIG","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":50,"geometry":{"type":"Point","coordinates":[-8567538.0894000009,-1361134.1671999991]},"properties":{"OBJECTID":50,"Código_Único":"00006107","Distrito":"SAN JUAN DE MIRAFLORES","Categoria":"I-4","POINT_Y":-12.135509619999937,"DIRECCION":"Av. Prolongacion gabriel torres s/n pamplona alta, SJM","NOM_EESS_RECOR":"C.M.I. OLLANTAY","AMBULANCIAS":4,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":3,"camillas_ocupadas":0,"camillas_disponibles":3,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":null}},
-        {"type":"Feature","id":51,"geometry":{"type":"Point","coordinates":[-8568370.5443999991,-1361935.2712999992]},"properties":{"OBJECTID":51,"Código_Único":"00006106","Distrito":"SAN JUAN DE MIRAFLORES","Categoria":"I-3","POINT_Y":-12.142545149999933,"DIRECCION":"Av. Villa solidaridad o10 1 sector villa san luis y josé c. mariátegui villa san luis","NOM_EESS_RECOR":"C.S. VILLA SAN LUIS","AMBULANCIAS":5,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":3,"camillas_ocupadas":0,"camillas_disponibles":3,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":null}},
-        {"type":"Feature","id":57,"geometry":{"type":"Point","coordinates":[-8572316.7980000004,-1362515.1843999997]},"properties":{"OBJECTID":57,"Código_Único":"00005993","Distrito":"SANTIAGO DE SURCO","Categoria":"I-3","POINT_Y":-12.147637999999972,"DIRECCION":"jirón daniel cornejo 182 santiago de surco lima lima","NOM_EESS_RECOR":"C.S. SANTIAGO DE SURCO","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":63,"geometry":{"type":"Point","coordinates":[-8565609.7653000001,-1368303.872299999]},"properties":{"OBJECTID":63,"Código_Único":"00006132","Distrito":"VILLA EL SALVADOR","Categoria":"I-4","POINT_Y":-12.19846943999994,"DIRECCION":"Sector 01, grupo 15, Interseccion Av. Revolucion y Av. Los Angeles","NOM_EESS_RECOR":"C.M.I. SAN JOSE","AMBULANCIAS":8,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":5,"camas_ocupadas":0,"camas_disponibles":5,"porc_ocupacion":0,"camas_mosquiteros":5,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":67,"geometry":{"type":"Point","coordinates":[-8560282.9050999992,-1374263.1642000005]},"properties":{"OBJECTID":67,"Código_Único":"00006080","Distrito":"LURIN","Categoria":"I-3","POINT_Y":-12.250788799999953,"DIRECCION":"Av. Las Acasias mz b lt 12 st 1 julio c. tello, lurin","NOM_EESS_RECOR":"C.S. JULIO C. TELLO","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":null}},
-        {"type":"Feature","id":69,"geometry":{"type":"Point","coordinates":[-8555804.2324999999,-1371681.2408000007]},"properties":{"OBJECTID":69,"Código_Único":"00006090","Distrito":"PACHACAMAC","Categoria":"I-4","POINT_Y":-12.228122179999957,"DIRECCION":"Av. Colonial s/n y esq. castilla, pachacamac","NOM_EESS_RECOR":"C.M.I. PACHACAMAC","AMBULANCIAS":16,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":3,"camas_ocupadas":0,"camas_disponibles":3,"porc_ocupacion":0,"camas_mosquiteros":3,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":"EESS"}},
-        {"type":"Feature","id":77,"geometry":{"type":"Point","coordinates":[-8561311.5305000003,-1369668.6086000018]},"properties":{"OBJECTID":77,"Código_Único":"00006141","Distrito":"VILLA MARIA DEL TRIUNFO","Categoria":"I-4","POINT_Y":-12.210451999999975,"DIRECCION":"Ca. Arica con Agricultura s/n, VMT","NOM_EESS_RECOR":"C.M.I. JOSE GALVEZ","AMBULANCIAS":15,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":10,"camas_ocupadas":0,"camas_disponibles":10,"porc_ocupacion":0,"camas_mosquiteros":5,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":null,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":91,"geometry":{"type":"Point","coordinates":[-8574233.0517999995,-1364680.8258999996]},"properties":{"OBJECTID":91,"Código_Único":"00006162","Distrito":"CHORRILLOS","Categoria":"I-4","POINT_Y":-12.166655999999932,"DIRECCION":"Ca. ferrocarril s/n, Chorrillos","NOM_EESS_RECOR":"C.E. SAN PEDRO DE LOS CHORRILLOS","AMBULANCIAS":1,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":2,"camas_ocupadas":0,"camas_disponibles":2,"porc_ocupacion":0,"camas_mosquiteros":2,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":null}},
-        {"type":"Feature","id":103,"geometry":{"type":"Point","coordinates":[-8568856.2079000007,-1363643.6160000004]},"properties":{"OBJECTID":103,"Código_Único":"00006115","Distrito":"SAN JUAN DE MIRAFLORES","Categoria":"I-3","POINT_Y":-12.15754770999996,"DIRECCION":"Psje. San juan s/n zona a (junto comisaría sjm), SJM","NOM_EESS_RECOR":"C.S. SAN JUAN DE MIRAFLORES","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":2,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":109,"geometry":{"type":"Point","coordinates":[-8563100.2120999992,-1371937.8465000018]},"properties":{"OBJECTID":109,"Código_Único":"00006124","Distrito":"VILLA EL SALVADOR","Categoria":"I-4","POINT_Y":-12.230374999999981,"DIRECCION":"Sector IV- Mza. B-I Etapa Urb. Pachac","NOM_EESS_RECOR":"C.M.I. CESAR LOPEZ SILVA","AMBULANCIAS":10,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":2,"camas_ocupadas":0,"camas_disponibles":2,"porc_ocupacion":0,"camas_mosquiteros":2,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":null,"rrhh":null}},
-        {"type":"Feature","id":112,"geometry":{"type":"Point","coordinates":[-8573943.8738000002,-1367781.5489000008]},"properties":{"OBJECTID":112,"Código_Único":"00006000","Distrito":"CHORRILLOS","Categoria":"I-4","POINT_Y":-12.193883229999926,"DIRECCION":"Av. principal (altura de la calle 12) aahh san genaro, Chorrillos","NOM_EESS_RECOR":"C.S. SAN GENARO DE VILLA","AMBULANCIAS":3,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":2,"camas_ocupadas":0,"camas_disponibles":2,"porc_ocupacion":0,"camas_mosquiteros":2,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":"EESS"}},
-        {"type":"Feature","id":116,"geometry":{"type":"Point","coordinates":[-8558453.2634999994,-1355819.4653999992]},"properties":{"OBJECTID":116,"Código_Único":"00006092","Distrito":"PACHACAMAC","Categoria":"I-3","POINT_Y":-12.088829659999931,"DIRECCION":"Ca. 7 cruce con Ca. 4 Mz F Lt 11 AAHH Portada de Manchay, Pachacamac","NOM_EESS_RECOR":"C.S. PORTADA DE MANCHAY","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":117,"geometry":{"type":"Point","coordinates":[-8552294.0952000003,-1384150.2309000008]},"properties":{"OBJECTID":117,"Código_Único":"00006086","Distrito":"PUNTA HERMOSA","Categoria":"I-3","POINT_Y":-12.337568999999974,"DIRECCION":"Jr. Pimental Nº 248 Mz G Lt 9, Puente Hermosa","NOM_EESS_RECOR":"C.S. PUNTA HERMOSA","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":121,"geometry":{"type":"Point","coordinates":[-8565532.4317000005,-1365968.2364000008]},"properties":{"OBJECTID":121,"Código_Único":"00006153","Distrito":"VILLA MARIA DEL TRIUNFO","Categoria":"I-4","POINT_Y":-12.177960999999982,"DIRECCION":"Av. pachacutec nº 3470, VMT","NOM_EESS_RECOR":"C.M.I. DANIEL ALCIDES CARRION","AMBULANCIAS":13,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":8,"camas_ocupadas":0,"camas_disponibles":8,"porc_ocupacion":0,"camas_mosquiteros":8,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":122,"geometry":{"type":"Point","coordinates":[-8562576.8356999997,-1364782.6163999997]},"properties":{"OBJECTID":122,"Código_Único":"00006142","Distrito":"VILLA MARIA DEL TRIUNFO","Categoria":"I-3","POINT_Y":-12.167549859999951,"DIRECCION":"avenida av. condebamba s/n, VMT","NOM_EESS_RECOR":"C.S. VIRGEN DE LOURDES","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":126,"geometry":{"type":"Point","coordinates":[-8563887.0183000006,-1374030.804299999]},"properties":{"OBJECTID":126,"Código_Único":"00007278","Distrito":"VILLA EL SALVADOR","Categoria":"I-3","POINT_Y":-12.248748999999975,"DIRECCION":"Jr. Heroes del Cenepa Mza C Lote 20, ALT DE PANAM.SUR","NOM_EESS_RECOR":"C.S. HEROES DEL CENEPA","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":127,"geometry":{"type":"Point","coordinates":[-8565594.5480000004,-1370707.4730000012]},"properties":{"OBJECTID":127,"Código_Único":"00006133","Distrito":"VILLA EL SALVADOR","Categoria":"I-4","POINT_Y":-12.219572999999968,"DIRECCION":"Av. Mariano Pastor Sevilla s/n ,sector 6,grupo 6, VES","NOM_EESS_RECOR":"C.M.I. JUAN PABLO II","AMBULANCIAS":9,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":6,"camas_ocupadas":0,"camas_disponibles":6,"porc_ocupacion":0,"camas_mosquiteros":6,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":"EXCLUSIVO"}},
-        {"type":"Feature","id":128,"geometry":{"type":"Point","coordinates":[-8563515.6743000001,-1373619.1132000014]},"properties":{"OBJECTID":128,"Código_Único":"00006128","Distrito":"VILLA EL SALVADOR","Categoria":"I-3","POINT_Y":-12.245134879999966,"DIRECCION":"Av. Tahuantinsuyo Mza U s/n Sector 10 AAHH Edilberto Ramos, VES","NOM_EESS_RECOR":"C.S. EDILBERTO RAMOS","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":131,"geometry":{"type":"Point","coordinates":[-8562375.4799000006,-1373402.9164999984]},"properties":{"OBJECTID":131,"Código_Único":"00006129","Distrito":"VILLA EL SALVADOR","Categoria":"I-3","POINT_Y":-12.243236929999966,"DIRECCION":"Av. Maria Reich Mza. K s/n AA.HH. Brisas de Pachacamac","NOM_EESS_RECOR":"C.S. BRISAS DE PACHACAMAC","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":132,"geometry":{"type":"Point","coordinates":[-8573870.4842000008,-1364613.5245000012]},"properties":{"OBJECTID":132,"Código_Único":"00005991","Distrito":"CHORRILLOS","Categoria":"I-4","POINT_Y":-12.166064999999946,"DIRECCION":"Ca. Leopoldo Arias nro. 200 chorrillos","NOM_EESS_RECOR":"C.M.I. VIRGEN DEL CARMEN","AMBULANCIAS":2,"tipo_atencion":"UVICLIN","estado_uviclin":"ACTIVO","camas_totales":2,"camas_ocupadas":0,"camas_disponibles":2,"porc_ocupacion":0,"camas_mosquiteros":2,"camillas_totales":0,"camillas_ocupadas":0,"camillas_disponibles":0,"porc_ocup_camill":0,"camillas_mosquiteros":0,"rrhh":null}},
-        {"type":"Feature","id":138,"geometry":{"type":"Point","coordinates":[-8561531.2752,-1372601.804299999]},"properties":{"OBJECTID":138,"Código_Único":"00006082","Distrito":"LURIN","Categoria":"I-3","POINT_Y":-12.23620399999993,"DIRECCION":"MZ L- LOTE 31- I Etapa AAHH VILLA ALEJANDRO , LURIN","NOM_EESS_RECOR":"C.S. VILLA ALEJANDRO","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":1,"camillas_ocupadas":0,"camillas_disponibles":1,"porc_ocup_camill":0,"camillas_mosquiteros":1,"rrhh":null}},
-        {"type":"Feature","id":140,"geometry":{"type":"Point","coordinates":[-8548901.2184999995,-1387087.5223999992]},"properties":{"OBJECTID":140,"Código_Único":"00006087","Distrito":"PUNTA NEGRA","Categoria":"I-3","POINT_Y":-12.363344499999926,"DIRECCION":"Av. Guayanay norte - zona central mz h-1 lt 6 punta negra","NOM_EESS_RECOR":"C.S. PUNTA NEGRA","AMBULANCIAS":null,"tipo_atencion":"UNIDAD FEBRIL","estado_uviclin":"ACTIVO","camas_totales":0,"camas_ocupadas":0,"camas_disponibles":0,"porc_ocupacion":0,"camas_mosquiteros":0,"camillas_totales":2,"camillas_ocupadas":0,"camillas_disponibles":2,"porc_ocup_camill":0,"camillas_mosquiteros":2,"rrhh":null}}
-      ]
-    };
-
-    // 2. Inicializar mapa centrado en Lima Sur
+    // 1. Configuración de mapa base
     const map = L.map('map').setView([-12.203, -76.973], 12);
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -202,73 +235,84 @@
       attribution: 'Tiles © Esri'
     }).addTo(map);
 
-    let eessGeoJSON = null;
-    let geojsonLayer = null;
+    let eessGeoJSON = null;      // Estructura GeoJSON en memoria
+    let geojsonLayer = null;     // Capa gráfica Leaflet
     let userMarker = null;
     let rutaLayer = null;
-    
-    // Estado global de las etiquetas (OFF por defecto)
+    let modoAgregarActivo = false;
     let etiquetasVisibles = false;
 
-    // 3. Iconos personalizados consumiendo archivos png
+    // Iconos personalizados
     const iconUviclin = L.icon({
       iconUrl: 'uviclin.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -30]
+      iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -30]
     });
 
     const iconFebril = L.icon({
       iconUrl: 'unidad febril.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -30]
+      iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -30]
     });
 
     const iconDefault = L.icon({
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34]
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
     });
 
-    // Conversión matemática de Web Mercator (EPSG:3857) a WGS84 (EPSG:4326)
+    // Funciones matemáticas de proyección (EPSG:3857 a EPSG:4326)
     function webMercatorToWGS84(x, y) {
       const lng = (x / 6378137.0) * (180 / Math.PI);
       const lat = (Math.atan(Math.exp(y / 6378137.0)) - (Math.PI / 4)) * 2 * (180 / Math.PI);
       return [lng, lat];
     }
 
-    // Procesar coordenadas a WGS84
-    const featuresConvertidos = rawData.features.map(f => {
-      const coordsWGS84 = webMercatorToWGS84(f.geometry.coordinates[0], f.geometry.coordinates[1]);
-      return turf.point(coordsWGS84, f.properties);
-    });
+    function wgs84ToWebMercator(lng, lat) {
+      const x = lng * 20037508.34 / 180;
+      let y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180);
+      y = y * 20037508.34 / 180;
+      return [x, y];
+    }
 
-    eessGeoJSON = turf.featureCollection(featuresConvertidos);
+    // 2. Cargar dinámicamente desde el archivo establecimientos.geojson
+    fetch('./establecimientos.geojson')
+      .then(res => {
+        if (!res.ok) throw new Error("No se pudo leer establecimientos.geojson");
+        return res.json();
+      })
+      .then(data => {
+        // Normalizar geometrías a EPSG:4326 WGS84 para Turf.js y Leaflet
+        const featuresConvertidos = data.features.map(f => {
+          let coords = f.geometry.coordinates;
+          // Si las coordenadas están en Web Mercator (-8500000 aprox), convertimos
+          if (Math.abs(coords[0]) > 180) {
+            coords = webMercatorToWGS84(coords[0], coords[1]);
+          }
+          return turf.point(coords, f.properties);
+        });
 
-    // 4. Función principal para renderizar la capa (con soporte de filtrado)
+        eessGeoJSON = turf.featureCollection(featuresConvertidos);
+        renderizarMapa("TODOS");
+      })
+      .catch(err => {
+        console.error("Error al cargar el GeoJSON:", err);
+        alert("Atención: Asegúrate de tener el archivo 'establecimientos.geojson' en la raíz de tu repositorio.");
+      });
+
+    // 3. Renderizar Capa en Mapa
     function renderizarMapa(filtroTipo = "TODOS") {
-      // Limpiar capa previa si existe
-      if (geojsonLayer) {
-        map.removeLayer(geojsonLayer);
-      }
+      if (geojsonLayer) map.removeLayer(geojsonLayer);
+      if (!eessGeoJSON) return;
 
-      // Filtrar features según el select
       const featuresFiltrados = eessGeoJSON.features.filter(f => {
         if (filtroTipo === "TODOS") return true;
         return f.properties.tipo_atencion === filtroTipo;
       });
 
-      const geojsonFiltrado = turf.featureCollection(featuresFiltrados);
-
-      // Clase CSS para controlar si las etiquetas están visibles u ocultas por defecto
       const labelClass = etiquetasVisibles ? 'label-eess' : 'label-eess label-eess-hidden';
 
-      geojsonLayer = L.geoJSON(geojsonFiltrado, {
+      geojsonLayer = L.geoJSON(turf.featureCollection(featuresFiltrados), {
         pointToLayer: function (feature, latlng) {
           const tipo = feature.properties.tipo_atencion;
           if (tipo === "UVICLIN") return L.marker(latlng, { icon: iconUviclin });
@@ -281,23 +325,19 @@
           if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
           if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
 
-          // Asignar tooltip/etiqueta
           layer.bindTooltip(p.NOM_EESS_RECOR || p.NOMBRE, {
-            permanent: true,
-            direction: 'bottom',
-            offset: [0, 8],
-            className: labelClass
+            permanent: true, direction: 'bottom', offset: [0, 8], className: labelClass
           });
 
-          // Contenido del Popup
           const popupContent = `
             <div class="popup-eess">
               <b>${p.NOM_EESS_RECOR}</b><br>
-              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria}</span><br>
-              <b>Distrito:</b> ${p.Distrito}<br>
-              <b>Dirección:</b> ${p.DIRECCION}<br>
+              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria || 'N/A'}</span><br>
+              <b>Distrito:</b> ${p.Distrito || ''}<br>
+              <b>Dirección:</b> ${p.DIRECCION || ''}<br>
               <b>Camas Disponibles:</b> ${p.camas_disponibles || 0}<br>
-              <b>Camillas Disponibles:</b> ${p.camillas_disponibles || 0}
+              <b>Camillas Disponibles:</b> ${p.camillas_disponibles || 0}<br>
+              <button class="btn-edit-popup" onclick="abrirModalEditar(${p.OBJECTID})">✏️ Editar Datos</button>
             </div>
           `;
           layer.bindPopup(popupContent);
@@ -305,10 +345,125 @@
       }).addTo(map);
     }
 
-    // Inicializar mapa mostrando todos los puntos (etiquetas apagadas por defecto)
-    renderizarMapa("TODOS");
+    // 4. Modal y Sistema de Registro/Edición
+    function abrirModalEditar(objectId) {
+      const feature = eessGeoJSON.features.find(f => f.properties.OBJECTID === objectId);
+      if (!feature) return;
 
-    // 5. Función para Activar/Desactivar Etiquetas
+      const p = feature.properties;
+      document.getElementById('modalTitulo').innerText = "Editar Establecimiento";
+      document.getElementById('editObjectId').value = p.OBJECTID;
+      document.getElementById('editNombre').value = p.NOM_EESS_RECOR || '';
+      document.getElementById('editTipoAtencion').value = p.tipo_atencion || 'UVICLIN';
+      document.getElementById('editDistrito').value = p.Distrito || '';
+      document.getElementById('editCategoria').value = p.Categoria || '';
+      document.getElementById('editDireccion').value = p.DIRECCION || '';
+      document.getElementById('editCamas').value = p.camas_disponibles || 0;
+      document.getElementById('editCamillas').value = p.camillas_disponibles || 0;
+
+      document.getElementById('modalEESS').style.display = 'flex';
+    }
+
+    function activarModoAgregarEESS() {
+      modoAgregarActivo = true;
+      alert("Haz clic sobre el mapa en el lugar exacto donde se ubica el nuevo establecimiento.");
+      map.once('click', (e) => {
+        const { lat, lng } = e.latlng;
+        document.getElementById('modalTitulo').innerText = "Registrar Nuevo EESS";
+        document.getElementById('editObjectId').value = ""; // Vacío representa nuevo
+        document.getElementById('editLat').value = lat;
+        document.getElementById('editLng').value = lng;
+        
+        document.getElementById('editNombre').value = "";
+        document.getElementById('editTipoAtencion').value = "UVICLIN";
+        document.getElementById('editDistrito').value = "VILLA EL SALVADOR";
+        document.getElementById('editCategoria').value = "I-3";
+        document.getElementById('editDireccion').value = "";
+        document.getElementById('editCamas').value = 0;
+        document.getElementById('editCamillas').value = 0;
+
+        document.getElementById('modalEESS').style.display = 'flex';
+        modoAgregarActivo = false;
+      });
+    }
+
+    function guardarFormularioEESS(event) {
+      event.preventDefault();
+      const objectId = document.getElementById('editObjectId').value;
+
+      if (objectId) {
+        // Modo Edición
+        const feature = eessGeoJSON.features.find(f => f.properties.OBJECTID == objectId);
+        if (feature) {
+          feature.properties.NOM_EESS_RECOR = document.getElementById('editNombre').value;
+          feature.properties.tipo_atencion = document.getElementById('editTipoAtencion').value;
+          feature.properties.Distrito = document.getElementById('editDistrito').value;
+          feature.properties.Categoria = document.getElementById('editCategoria').value;
+          feature.properties.DIRECCION = document.getElementById('editDireccion').value;
+          feature.properties.camas_disponibles = parseInt(document.getElementById('editCamas').value) || 0;
+          feature.properties.camillas_disponibles = parseInt(document.getElementById('editCamillas').value) || 0;
+        }
+      } else {
+        // Modo Nuevo Registro
+        const lat = parseFloat(document.getElementById('editLat').value);
+        const lng = parseFloat(document.getElementById('editLng').value);
+        const nuevoId = Date.now(); // ID único genérico
+
+        const nuevoFeature = turf.point([lng, lat], {
+          OBJECTID: nuevoId,
+          NOM_EESS_RECOR: document.getElementById('editNombre').value,
+          tipo_atencion: document.getElementById('editTipoAtencion').value,
+          Distrito: document.getElementById('editDistrito').value,
+          Categoria: document.getElementById('editCategoria').value,
+          DIRECCION: document.getElementById('editDireccion').value,
+          camas_disponibles: parseInt(document.getElementById('editCamas').value) || 0,
+          camillas_disponibles: parseInt(document.getElementById('editCamillas').value) || 0
+        });
+
+        eessGeoJSON.features.push(nuevoFeature);
+      }
+
+      cerrarModal();
+      filtrarPorTipoAtencion();
+      
+      // Mostrar botón de descarga para salvar los cambios al GeoJSON
+      document.getElementById('btnDownloadGeoJSON').style.display = 'block';
+    }
+
+    function cerrarModal() {
+      document.getElementById('modalEESS').style.display = 'none';
+    }
+
+    // 5. Función para exportar/descargar el GeoJSON actualizado
+    function descargarGeoJSONActualizado() {
+      // Re-proyectar de vuelta a EPSG:3857 si se desea mantener la compatibilidad original con GIS
+      const exportFeatures = eessGeoJSON.features.map(f => {
+        const [lng, lat] = f.geometry.coordinates;
+        const [x, y] = wgs84ToWebMercator(lng, lat);
+        return {
+          type: "Feature",
+          id: f.properties.OBJECTID,
+          geometry: { type: "Point", coordinates: [x, y] },
+          properties: f.properties
+        };
+      });
+
+      const exportGeoJSON = {
+        type: "FeatureCollection",
+        crs: { type: "name", properties: { name: "EPSG:3857" } },
+        features: exportFeatures
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportGeoJSON, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "establecimientos.geojson");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    // 6. Controles Auxiliares
     function toggleEtiquetas() {
       etiquetasVisibles = !etiquetasVisibles;
       const btn = document.getElementById('btnToggleLabels');
@@ -325,17 +480,16 @@
       }
     }
 
-    // 6. Función para Filtrar por Tipo de Atención
     function filtrarPorTipoAtencion() {
       const valorSeleccionado = document.getElementById('selectTipoAtencion').value;
-      if (rutaLayer) map.removeLayer(rutaLayer); // Limpiar ruta previa si cambia el filtro
+      if (rutaLayer) map.removeLayer(rutaLayer);
       renderizarMapa(valorSeleccionado);
     }
 
-    // 7. Geolocalización por GPS (calcula el más cercano considerando los puntos filtrados)
+    // 7. GPS y Ruteo OSRM
     function obtenerUbicacionGPS() {
       if (!navigator.geolocation) {
-        alert("Tu dispositivo o navegador no soporta geolocalización por GPS.");
+        alert("Tu navegador no soporta geolocalización por GPS.");
         return;
       }
 
@@ -354,7 +508,6 @@
           }).addTo(map).bindPopup("<b>Tu Ubicación Actual</b>").openPopup();
 
           map.setView([userLat, userLng], 14);
-
           calcularRutaEESSMasCercano(userLngLat);
         },
         (error) => alert("Error al obtener GPS: " + error.message),
@@ -362,11 +515,8 @@
       );
     }
 
-    // 8. Cálculo del más cercano y trazo de ruta
     function calcularRutaEESSMasCercano(userLngLat) {
       const filtroActual = document.getElementById('selectTipoAtencion').value;
-      
-      // Obtener la colección de puntos filtrados según la selección actual
       const featuresVisibles = eessGeoJSON.features.filter(f => {
         if (filtroActual === "TODOS") return true;
         return f.properties.tipo_atencion === filtroActual;
@@ -401,18 +551,17 @@
             if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
             if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
 
-            // Crear el popup con offset vertical negativo para posicionado por encima del símbolo
             L.popup({
-              offset: [0, -35],           // Eleva el bocadillo 35px por encima del punto
-              autoPan: true,              // Reubica el mapa automáticamente para no cortar el popup
-              autoPanPadding: [20, 20]    // Margen de seguridad con los bordes de la pantalla
+              offset: [0, -35],
+              autoPan: true,
+              autoPanPadding: [20, 20]
             })
               .setLatLng([destinoCoords[1], destinoCoords[0]])
               .setContent(`
                 <div class="popup-eess">
                   <b>EESS Más Cercano (${filtroActual}):</b> ${p.NOM_EESS_RECOR}<br>
-                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria}</span><br>
-                  <b>Dirección:</b> ${p.DIRECCION}<hr>
+                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.Categoria || 'N/A'}</span><br>
+                  <b>Dirección:</b> ${p.DIRECCION || ''}<hr>
                   <b>Distancia vial:</b> ${distanciaKm} km<br>
                   <b>Tiempo estimado:</b> ${duracionMin} minutos
                 </div>
