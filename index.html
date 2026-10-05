@@ -349,20 +349,52 @@
       })
         .then(res => res.json())
         .then(dataRows => {
-          const features = dataRows.map(row => {
-            const lat = parseFloat(row.Y || 0);
-            const lng = parseFloat(row.X || 0);
-            return turf.point([lng, lat], row);
+          console.log("Filas recibidas desde Google Sheets:", dataRows);
+
+          if (!Array.isArray(dataRows) || dataRows.length === 0) {
+            alert("Atención: Google Sheets respondió pero no devolvió ningún registro.");
+            return;
+          }
+
+          const features = [];
+
+          dataRows.forEach((row, index) => {
+            // Buscar la propiedad X e Y sin importar mayúsculas/minúsculas ni espacios
+            let rawY = row.Y !== undefined ? row.Y : (row.y !== undefined ? row.y : "");
+            let rawX = row.X !== undefined ? row.X : (row.x !== undefined ? row.x : "");
+
+            // Convertir a texto, limpiar espacios y reemplazar coma decimal por punto si existe
+            let strY = String(rawY).trim().replace(',', '.');
+            let strX = String(rawX).trim().replace(',', '.');
+
+            let lat = parseFloat(strY); // Y = Latitud (-12.xxxx)
+            let lng = parseFloat(strX); // X = Longitud (-77.xxxx)
+
+            // Validar que las coordenadas sean números válidos para la zona de Lima/DIRIS Lima Sur
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              // turf.point requiere estrictamente [Longitud (X), Latitud (Y)]
+              features.push(turf.point([lng, lat], row));
+            } else {
+              console.warn(`Fila ${index + 1} omitida por coordenadas no válidas:`, { Y: rawY, X: rawX });
+            }
           });
-    
+
+          console.log(`Puntos procesados correctamente: ${features.length} de ${dataRows.length}`);
+
+          if (features.length === 0) {
+            alert("Se recibieron datos de Google Sheets, pero ninguna fila contenía coordenadas X e Y válidas.");
+            return;
+          }
+
           eessGeoJSON = turf.featureCollection(features);
           renderizarMapa("TODOS");
         })
         .catch(err => {
           console.error("Error al cargar desde Google Sheets:", err);
-          alert("Atención: Ocurrió un inconveniente de conexión con Google Sheets.");
+          alert("Atención: Ocurrió un error de red o de conexión con la URL de Apps Script.");
         });
     }
+
     // 3. Renderizar Capa en el Mapa
     function renderizarMapa(filtroTipo = "TODOS") {
       if (geojsonLayer) map.removeLayer(geojsonLayer);
@@ -396,12 +428,13 @@
             <div class="popup-eess">
               <b>${p.eess}</b><br>
               <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span><br>
+              <b>Código RENAES:</b> ${p.cod_ren}<br>
               <b>RIS:</b> ${p.ris || ''}<br>
               <b>Camas Totales:</b> ${p.camas_totales || 0} (Ocup: ${p.camas_ocupadas || 0} / Disp: ${p.camas_disponibles || 0})<br>
               <b>Camillas Totales:</b> ${p.camillas_totales || 0} (Ocup: ${p.camillas_ocupadas || 0} / Disp: ${p.camillas_disponibles || 0})<br>
               <b>Teléfono:</b> ${p.telefono_eess || 'N/A'}<br>
               <b>Jefe EESS:</b> ${p.jefe_eess || 'N/A'}<br>
-              <button class="btn-edit-popup" onclick="abrirModalEditar('${p.Id}')">✏️ Editar Datos</button>
+              <button class="btn-edit-popup" onclick="abrirModalEditar('${p.cod_ren}')">✏️ Editar Datos</button>
             </div>
           `;
           layer.bindPopup(popupContent);
@@ -410,12 +443,12 @@
     }
 
     // 4. Modal y Edición
-    function abrirModalEditar(idRegistro) {
-      const feature = eessGeoJSON.features.find(f => f.properties.Id == idRegistro);
+    function abrirModalEditar(codRen) {
+      const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRen).trim());
       if (!feature) return;
 
       const p = feature.properties;
-      document.getElementById('editId').value = p.Id;
+      document.getElementById('editId').value = p.cod_ren; // Guarda el cod_ren en el campo oculto
       document.getElementById('editNombre').value = p.eess || '';
       document.getElementById('editTipoAtencion').value = p.tipo_atencion || 'UVICLIN';
       document.getElementById('editEstado').value = p.estado_uviclin || 'ACTIVO';
@@ -442,55 +475,55 @@
       document.getElementById('modalEESS').style.display = 'flex';
     }
 
-      function guardarFormularioEESS(event) {
-        event.preventDefault();
-        const idRegistro = document.getElementById('editId').value;
-        const btnGuardar = document.getElementById('btnGuardarModal');
-      
-        const payload = {
-          Id: idRegistro,
-          tipo_atencion: document.getElementById('editTipoAtencion').value,
-          estado_uviclin: document.getElementById('editEstado').value,
-          camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
-          camas_disponibles: parseInt(document.getElementById('editCamasDisp').value) || 0,
-          camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value) || 0,
-          camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
-          camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
-          camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
-          telefono_eess: document.getElementById('editTelEESS').value,
-          jefe_eess: document.getElementById('editJefeEESS').value,
-          telefono_jefe_eess: document.getElementById('editTelJefe').value,
-          correo_eess: document.getElementById('editCorreoEESS').value,
-          horario_uvi: document.getElementById('editHorarioUVI').value,
-          dias_atencion: document.getElementById('editDiasAtencion').value,
-          brigadas: document.getElementById('editBrigadas').value,
-          rrhh: document.getElementById('editRRHH').value,
-          espacio_camas: document.getElementById('editEspacioCamas').value,
-          observación: document.getElementById('editObservacion').value
-        };
-      
-        btnGuardar.innerText = "Guardando...";
-        btnGuardar.disabled = true;
-      
-        fetch(URL_WEB_APP, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        })
-        .then(() => {
-          alert("¡Cambios guardados con éxito en Google Sheets!");
-          cerrarModal();
-          cargarDatosDesdeSheets();
-        })
-        .catch(err => {
-          alert("Error al intentar guardar: " + err);
-        })
-        .finally(() => {
-          btnGuardar.innerText = "Guardar Cambios";
-          btnGuardar.disabled = false;
-        });
-      }
+    function guardarFormularioEESS(event) {
+      event.preventDefault();
+      const idRegistro = document.getElementById('editId').value;
+      const btnGuardar = document.getElementById('btnGuardarModal');
+
+      const payload = {
+        Id: idRegistro,
+        tipo_atencion: document.getElementById('editTipoAtencion').value,
+        estado_uviclin: document.getElementById('editEstado').value,
+        camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
+        camas_disponibles: parseInt(document.getElementById('editCamasDisp').value) || 0,
+        camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value) || 0,
+        camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
+        camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
+        camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
+        telefono_eess: document.getElementById('editTelEESS').value,
+        jefe_eess: document.getElementById('editJefeEESS').value,
+        telefono_jefe_eess: document.getElementById('editTelJefe').value,
+        correo_eess: document.getElementById('editCorreoEESS').value,
+        horario_uvi: document.getElementById('editHorarioUVI').value,
+        dias_atencion: document.getElementById('editDiasAtencion').value,
+        brigadas: document.getElementById('editBrigadas').value,
+        rrhh: document.getElementById('editRRHH').value,
+        espacio_camas: document.getElementById('editEspacioCamas').value,
+        observación: document.getElementById('editObservacion').value
+      };
+
+      btnGuardar.innerText = "Guardando...";
+      btnGuardar.disabled = true;
+
+      fetch(URL_WEB_APP, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        alert("¡Cambios guardados con éxito en Google Sheets!");
+        cerrarModal();
+        cargarDatosDesdeSheets(); // Recargar datos para refrescar la vista
+      })
+      .catch(err => {
+        alert("Error al intentar guardar: " + err);
+      })
+      .finally(() => {
+        btnGuardar.innerText = "Guardar Cambios";
+        btnGuardar.disabled = false;
+      });
+    }
 
     function cerrarModal() {
       document.getElementById('modalEESS').style.display = 'none';
