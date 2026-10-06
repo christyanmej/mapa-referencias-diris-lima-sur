@@ -500,17 +500,17 @@
 
     function guardarFormularioEESS(event) {
       event.preventDefault();
-      const codRenTarget = document.getElementById('editCodRen').value;
+      const codRenTarget = document.getElementById('editCodRen').value.trim();
       const claveIngresada = document.getElementById('editClave').value.trim();
       const btnGuardar = document.getElementById('btnGuardarModal');
-
-      // VERIFICACIÓN PREVIA DE SEGURIDAD EN EL NAVEGADOR
+    
+      // VERIFICACIÓN PREVIA DE SEGURIDAD
       if (claveIngresada !== "6c07") {
         alert("❌ Error: La clave de edición es incorrecta. No se realizaron cambios.");
         document.getElementById('editClave').focus();
         return;
       }
-
+    
       const payload = {
         cod_ren: codRenTarget,
         clave: claveIngresada,
@@ -534,10 +534,10 @@
         observacion: document.getElementById('editObservacion').value,
         observación: document.getElementById('editObservacion').value
       };
-
+    
       btnGuardar.innerText = "Guardando...";
       btnGuardar.disabled = true;
-
+    
       fetch(URL_WEB_APP, {
         method: 'POST',
         mode: 'no-cors',
@@ -554,7 +554,7 @@
           feature.properties.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
           feature.properties.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
         }
-
+    
         cerrarModal();
         filtrarEstablecimientos();
       })
