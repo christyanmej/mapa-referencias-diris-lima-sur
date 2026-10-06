@@ -515,7 +515,7 @@
         return;
       }
     
-      const payload = {
+    const payload = {
         cod_ren: codRenTarget,
         clave: claveIngresada,
         tipo_atencion: document.getElementById('editTipoAtencion').value,
@@ -535,8 +535,7 @@
         brigadas: document.getElementById('editBrigadas').value,
         rrhh: document.getElementById('editRRHH').value,
         espacio_camas: document.getElementById('editEspacioCamas').value,
-        observacion: document.getElementById('editObservacion').value,
-        observación: document.getElementById('editObservacion').value
+        observación: document.getElementById('editObservacion').value // <--- Propiedad enviada con la tilde exacta
       };
     
       btnGuardar.innerText = "Guardando...";
