@@ -566,10 +566,17 @@
     function guardarFormularioEESS(event) {
       event.preventDefault();
       const codRenTarget = document.getElementById('editCodRen').value;
+      const claveIngresada = document.getElementById('editClave').value;
       const btnGuardar = document.getElementById('btnGuardarModal');
-
+    
+      if (!claveIngresada) {
+        alert("Por favor ingresa la clave de edición.");
+        return;
+      }
+    
       const payload = {
         cod_ren: codRenTarget,
+        clave: claveIngresada, // Se envía la clave para la validación en Apps Script
         tipo_atencion: document.getElementById('editTipoAtencion').value,
         estado_uviclin: document.getElementById('editEstado').value,
         camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
@@ -589,11 +596,11 @@
         espacio_camas: document.getElementById('editEspacioCamas').value,
         observación: document.getElementById('editObservacion').value
       };
-
+    
       btnGuardar.innerText = "Guardando...";
       btnGuardar.disabled = true;
-
-      // Envío seguro evitando bloqueos CORS
+    
+      // PETICIÓN SEGURA PARA EVITAR BLOQUEOS CORS
       fetch(URL_WEB_APP, {
         method: 'POST',
         mode: 'no-cors',
@@ -601,7 +608,7 @@
         body: JSON.stringify(payload)
       })
       .then(() => {
-        alert("¡Cambios guardados con éxito en Google Sheets!");
+        alert("¡Solicitud enviada! Si la clave fue correcta, los datos se actualizaron en Google Sheets.");
         
         // Actualización local inmediata en el mapa
         const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
@@ -610,9 +617,9 @@
           feature.properties.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
           feature.properties.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
         }
-
+    
         cerrarModal();
-        filtrarPorTipoAtencion();
+        filtrarEstablecimientos();
       })
       .catch(err => {
         alert("Error al intentar guardar: " + err);
