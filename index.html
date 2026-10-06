@@ -170,7 +170,7 @@
       <option value="UNIDAD FEBRIL">🌡️ Solo UNIDAD FEBRIL</option>
     </select>
 
-    <!-- NUEVO: Filtro por Estado (Por defecto ACTIVO) -->
+    <!-- Filtro por Estado (Por defecto ACTIVO) -->
     <select id="selectEstado" class="select-tipo" onchange="filtrarEstablecimientos()">
       <option value="ACTIVO" selected>✅ Solo EESS ACTIVOS</option>
       <option value="TODOS">🌐 Mostrar Todos (Activos e Inactivos)</option>
@@ -185,7 +185,7 @@
     <div class="legend-item"><img src="unidad febril.png" alt="UNIDAD FEBRIL" onerror="this.src='https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png'"> UNIDAD FEBRIL</div>
   </div>
 
-  <!-- Modal para Formulario de Edición con campo de Clave organizado -->
+  <!-- Modal para Formulario de Edición -->
   <div id="modalEESS" class="modal-overlay">
     <div class="modal-content">
       <h3>Editar Establecimiento</h3>
@@ -198,7 +198,7 @@
           <input type="text" id="editNombre" readonly>
         </div>
   
-        <!-- NUEVO: Campo de Clave de Seguridad -->
+        <!-- Campo de Clave de Seguridad -->
         <div class="form-group" style="background: #fff3cd; padding: 8px; border-radius: 6px; border: 1px solid #ffeeba; margin-bottom: 12px;">
           <label style="color: #856404;">🔑 Clave de Edición (Requerida):</label>
           <input type="password" id="editClave" placeholder="Ingresa la clave para guardar" required>
@@ -264,7 +264,7 @@
             <input type="text" id="editJefeEESS">
           </div>
         </div>
-  
+
         <div class="form-row">
           <div class="form-group">
             <label>Teléfono Jefe:</label>
@@ -275,7 +275,7 @@
             <input type="email" id="editCorreoEESS">
           </div>
         </div>
-  
+
         <div class="form-row">
           <div class="form-group">
             <label>Horario UVI:</label>
@@ -286,7 +286,7 @@
             <input type="text" id="editDiasAtencion">
           </div>
         </div>
-  
+
         <div class="form-row">
           <div class="form-group">
             <label>Brigadas:</label>
@@ -297,12 +297,12 @@
             <input type="text" id="editRRHH">
           </div>
         </div>
-  
+
         <div class="form-group">
           <label>Espacio Adicional Camas:</label>
           <input type="text" id="editEspacioCamas">
         </div>
-  
+
         <div class="form-group">
           <label>Observaciones:</label>
           <textarea id="editObservacion" rows="2"></textarea>
@@ -312,9 +312,9 @@
           <button type="submit" id="btnGuardarModal" class="btn-save">Guardar Cambios</button>
           <button type="button" class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
         </div>
-        </form>
-      </div>
-    </div>  
+      </form>
+    </div>
+  </div>  
 
   <div id="map"></div>
 
@@ -393,15 +393,15 @@
           }
 
           eessGeoJSON = turf.featureCollection(features);
-          renderizarMapa("TODOS");
+          filtrarEstablecimientos();
         })
         .catch(err => {
           console.error("Error al cargar desde Google Sheets:", err);
           alert("Atención: Ocurrió un error de red o de conexión con la URL de Apps Script.");
         });
     }
-    
-    // 1. Nueva función unificada de filtrado
+
+    // 3. Filtrado combinado de Tipo y Estado
     function filtrarEstablecimientos() {
       if (rutaLayer) map.removeLayer(rutaLayer);
       const tipoSeleccionado = document.getElementById('selectTipoAtencion').value;
@@ -410,18 +410,13 @@
       renderizarMapa(tipoSeleccionado, estadoSeleccionado);
     }
 
-    // 2. Renderizar capa aplicando ambos filtros
     function renderizarMapa(filtroTipo = "TODOS", filtroEstado = "ACTIVO") {
       if (geojsonLayer) map.removeLayer(geojsonLayer);
       if (!eessGeoJSON) return;
 
       const featuresFiltrados = eessGeoJSON.features.filter(f => {
         const p = f.properties;
-        
-        // Evaluar Tipo de Atención
         const cumpleTipo = (filtroTipo === "TODOS") || (p.tipo_atencion === filtroTipo);
-        
-        // Evaluar Estado (Normalizar a mayúsculas para evitar desfases)
         const estadoReal = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
         const cumpleEstado = (filtroEstado === "TODOS") || (estadoReal === filtroEstado);
 
@@ -468,7 +463,160 @@
       }).addTo(map);
     }
 
-    // 3. Ajustar el cálculo de rutas para considerar los establecimientos visibles actualmente
+    // 4. Modal y Edición
+    function abrirModalEditar(codRen) {
+      const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRen).trim());
+      if (!feature) return;
+
+      const p = feature.properties;
+      document.getElementById('editCodRen').value = p.cod_ren;
+      document.getElementById('editNombre').value = p.eess || '';
+      document.getElementById('editClave').value = ''; // Limpiar contraseña por seguridad
+      
+      document.getElementById('editTipoAtencion').value = (p.tipo_atencion || 'UVICLIN').toUpperCase().trim();
+      document.getElementById('editEstado').value = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+      
+      document.getElementById('editCamasOcup').value = p.camas_ocupadas || 0;
+      document.getElementById('editCamasDisp').value = p.camas_disponibles || 0;
+      document.getElementById('editCamasMosq').value = p.camas_mosquiteros || 0;
+
+      document.getElementById('editCamillasOcup').value = p.camillas_ocupadas || 0;
+      document.getElementById('editCamillasDisp').value = p.camillas_disponibles || 0;
+      document.getElementById('editCamillasMosq').value = p.camillas_mosquiteros || 0;
+
+      document.getElementById('editTelEESS').value = p.telefono_eess || '';
+      document.getElementById('editJefeEESS').value = p.jefe_eess || '';
+      document.getElementById('editTelJefe').value = p.telefono_jefe_eess || '';
+      document.getElementById('editCorreoEESS').value = p.correo_eess || '';
+      document.getElementById('editHorarioUVI').value = p.horario_uvi || '';
+      document.getElementById('editDiasAtencion').value = p.dias_atencion || '';
+      document.getElementById('editBrigadas').value = p.brigadas || '';
+      document.getElementById('editRRHH').value = p.rrhh || '';
+      document.getElementById('editEspacioCamas').value = p.espacio_camas || '';
+      document.getElementById('editObservacion').value = p.observación || p.observacion || '';
+
+      document.getElementById('modalEESS').style.display = 'flex';
+    }
+
+    function guardarFormularioEESS(event) {
+      event.preventDefault();
+      const codRenTarget = document.getElementById('editCodRen').value;
+      const claveIngresada = document.getElementById('editClave').value.trim();
+      const btnGuardar = document.getElementById('btnGuardarModal');
+
+      // VERIFICACIÓN PREVIA DE SEGURIDAD EN EL NAVEGADOR
+      if (claveIngresada !== "6c07") {
+        alert("❌ Error: La clave de edición es incorrecta. No se realizaron cambios.");
+        document.getElementById('editClave').focus();
+        return;
+      }
+
+      const payload = {
+        cod_ren: codRenTarget,
+        clave: claveIngresada,
+        tipo_atencion: document.getElementById('editTipoAtencion').value,
+        estado_uviclin: document.getElementById('editEstado').value,
+        camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
+        camas_disponibles: parseInt(document.getElementById('editCamasDisp').value) || 0,
+        camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value) || 0,
+        camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
+        camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
+        camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
+        telefono_eess: document.getElementById('editTelEESS').value,
+        jefe_eess: document.getElementById('editJefeEESS').value,
+        telefono_jefe_eess: document.getElementById('editTelJefe').value,
+        correo_eess: document.getElementById('editCorreoEESS').value,
+        horario_uvi: document.getElementById('editHorarioUVI').value,
+        dias_atencion: document.getElementById('editDiasAtencion').value,
+        brigadas: document.getElementById('editBrigadas').value,
+        rrhh: document.getElementById('editRRHH').value,
+        espacio_camas: document.getElementById('editEspacioCamas').value,
+        observacion: document.getElementById('editObservacion').value,
+        observación: document.getElementById('editObservacion').value
+      };
+
+      btnGuardar.innerText = "Guardando...";
+      btnGuardar.disabled = true;
+
+      fetch(URL_WEB_APP, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        alert("✅ ¡Éxito! Clave validada y datos actualizados en Google Sheets.");
+        
+        // Actualizar la memoria del GeoJSON inmediatamente
+        const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
+        if (feature) {
+          Object.assign(feature.properties, payload);
+          feature.properties.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
+          feature.properties.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
+        }
+
+        cerrarModal();
+        filtrarEstablecimientos();
+      })
+      .catch(err => {
+        alert("❌ Error al conectar con Google Sheets: " + err);
+      })
+      .finally(() => {
+        btnGuardar.innerText = "Guardar Cambios";
+        btnGuardar.disabled = false;
+      });
+    }
+
+    function cerrarModal() {
+      document.getElementById('modalEESS').style.display = 'none';
+    }
+
+    // 5. Controles Auxiliares
+    function toggleEtiquetas() {
+      etiquetasVisibles = !etiquetasVisibles;
+      const btn = document.getElementById('btnToggleLabels');
+      const etiquetas = document.querySelectorAll('.label-eess');
+
+      if (etiquetasVisibles) {
+        btn.innerText = '🏷️ Etiquetas: ON';
+        btn.classList.add('active');
+        etiquetas.forEach(el => el.classList.remove('label-eess-hidden'));
+      } else {
+        btn.innerText = '🏷️ Etiquetas: OFF';
+        btn.classList.remove('active');
+        etiquetas.forEach(el => el.classList.add('label-eess-hidden'));
+      }
+    }
+
+    // 6. GPS y Ruteo OSRM
+    function obtenerUbicacionGPS() {
+      if (!navigator.geolocation) {
+        alert("Tu navegador no soporta geolocalización por GPS.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const userLat = pos.coords.latitude;
+          const userLng = pos.coords.longitude;
+          const userLngLat = [userLng, userLat];
+
+          if (userMarker) map.removeLayer(userMarker);
+          userMarker = L.marker([userLat, userLng], {
+            icon: L.divIcon({
+              className: 'user-icon',
+              html: '<div style="background-color:#d9534f; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 6px rgba(0,0,0,0.5);"></div>'
+            })
+          }).addTo(map).bindPopup("<b>Tu Ubicación Actual</b>").openPopup();
+
+          map.setView([userLat, userLng], 14);
+          calcularRutaEESSMasCercano(userLngLat);
+        },
+        (error) => alert("Error al obtener GPS: " + error.message),
+        { enableHighAccuracy: true }
+      );
+    }
+
     function calcularRutaEESSMasCercano(userLngLat) {
       const filtroTipo = document.getElementById('selectTipoAtencion').value;
       const filtroEstado = document.getElementById('selectEstado').value;
@@ -528,162 +676,6 @@
               .openOn(map);
           }
         });
-    }
-
-    // 4. Modal y Edición
-    function abrirModalEditar(codRen) {
-      const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRen).trim());
-      if (!feature) return;
-
-      const p = feature.properties;
-      document.getElementById('editCodRen').value = p.cod_ren; // Guarda el cod_ren exacto
-      document.getElementById('editNombre').value = p.eess || '';
-      document.getElementById('editTipoAtencion').value = p.tipo_atencion || 'UVICLIN';
-      document.getElementById('editEstado').value = p.estado_uviclin || 'ACTIVO';
-      
-      document.getElementById('editCamasOcup').value = p.camas_ocupadas || 0;
-      document.getElementById('editCamasDisp').value = p.camas_disponibles || 0;
-      document.getElementById('editCamasMosq').value = p.camas_mosquiteros || 0;
-
-      document.getElementById('editCamillasOcup').value = p.camillas_ocupadas || 0;
-      document.getElementById('editCamillasDisp').value = p.camillas_disponibles || 0;
-      document.getElementById('editCamillasMosq').value = p.camillas_mosquiteros || 0;
-
-      document.getElementById('editTelEESS').value = p.telefono_eess || '';
-      document.getElementById('editJefeEESS').value = p.jefe_eess || '';
-      document.getElementById('editTelJefe').value = p.telefono_jefe_eess || '';
-      document.getElementById('editCorreoEESS').value = p.correo_eess || '';
-      document.getElementById('editHorarioUVI').value = p.horario_uvi || '';
-      document.getElementById('editDiasAtencion').value = p.dias_atencion || '';
-      document.getElementById('editBrigadas').value = p.brigadas || '';
-      document.getElementById('editRRHH').value = p.rrhh || '';
-      document.getElementById('editEspacioCamas').value = p.espacio_camas || '';
-      document.getElementById('editObservacion').value = p.observación || '';
-
-      document.getElementById('modalEESS').style.display = 'flex';
-    }
-
-    function guardarFormularioEESS(event) {
-      event.preventDefault();
-      const codRenTarget = document.getElementById('editCodRen').value;
-      const claveIngresada = document.getElementById('editClave').value;
-      const btnGuardar = document.getElementById('btnGuardarModal');
-    
-      if (!claveIngresada) {
-        alert("Por favor ingresa la clave de edición.");
-        return;
-      }
-    
-      const payload = {
-        cod_ren: codRenTarget,
-        clave: claveIngresada, // Se envía la clave para la validación en Apps Script
-        tipo_atencion: document.getElementById('editTipoAtencion').value,
-        estado_uviclin: document.getElementById('editEstado').value,
-        camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
-        camas_disponibles: parseInt(document.getElementById('editCamasDisp').value) || 0,
-        camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value) || 0,
-        camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
-        camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
-        camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
-        telefono_eess: document.getElementById('editTelEESS').value,
-        jefe_eess: document.getElementById('editJefeEESS').value,
-        telefono_jefe_eess: document.getElementById('editTelJefe').value,
-        correo_eess: document.getElementById('editCorreoEESS').value,
-        horario_uvi: document.getElementById('editHorarioUVI').value,
-        dias_atencion: document.getElementById('editDiasAtencion').value,
-        brigadas: document.getElementById('editBrigadas').value,
-        rrhh: document.getElementById('editRRHH').value,
-        espacio_camas: document.getElementById('editEspacioCamas').value,
-        observación: document.getElementById('editObservacion').value
-      };
-    
-      btnGuardar.innerText = "Guardando...";
-      btnGuardar.disabled = true;
-    
-      // PETICIÓN SEGURA PARA EVITAR BLOQUEOS CORS
-      fetch(URL_WEB_APP, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      })
-      .then(() => {
-        alert("¡Solicitud enviada! Si la clave fue correcta, los datos se actualizaron en Google Sheets.");
-        
-        // Actualización local inmediata en el mapa
-        const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
-        if (feature) {
-          Object.assign(feature.properties, payload);
-          feature.properties.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
-          feature.properties.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
-        }
-    
-        cerrarModal();
-        filtrarEstablecimientos();
-      })
-      .catch(err => {
-        alert("Error al intentar guardar: " + err);
-      })
-      .finally(() => {
-        btnGuardar.innerText = "Guardar Cambios";
-        btnGuardar.disabled = false;
-      });
-    }
-
-    function cerrarModal() {
-      document.getElementById('modalEESS').style.display = 'none';
-    }
-
-    // 5. Controles Auxiliares
-    function toggleEtiquetas() {
-      etiquetasVisibles = !etiquetasVisibles;
-      const btn = document.getElementById('btnToggleLabels');
-      const etiquetas = document.querySelectorAll('.label-eess');
-
-      if (etiquetasVisibles) {
-        btn.innerText = '🏷️ Etiquetas: ON';
-        btn.classList.add('active');
-        etiquetas.forEach(el => el.classList.remove('label-eess-hidden'));
-      } else {
-        btn.innerText = '🏷️ Etiquetas: OFF';
-        btn.classList.remove('active');
-        etiquetas.forEach(el => el.classList.add('label-eess-hidden'));
-      }
-    }
-
-    function filtrarPorTipoAtencion() {
-      const valorSeleccionado = document.getElementById('selectTipoAtencion').value;
-      if (rutaLayer) map.removeLayer(rutaLayer);
-      renderizarMapa(valorSeleccionado);
-    }
-
-    // 6. GPS y Ruteo OSRM
-    function obtenerUbicacionGPS() {
-      if (!navigator.geolocation) {
-        alert("Tu navegador no soporta geolocalización por GPS.");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const userLat = pos.coords.latitude;
-          const userLng = pos.coords.longitude;
-          const userLngLat = [userLng, userLat];
-
-          if (userMarker) map.removeLayer(userMarker);
-          userMarker = L.marker([userLat, userLng], {
-            icon: L.divIcon({
-              className: 'user-icon',
-              html: '<div style="background-color:#d9534f; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 6px rgba(0,0,0,0.5);"></div>'
-            })
-          }).addTo(map).bindPopup("<b>Tu Ubicación Actual</b>").openPopup();
-
-          map.setView([userLat, userLng], 14);
-          calcularRutaEESSMasCercano(userLngLat);
-        },
-        (error) => alert("Error al obtener GPS: " + error.message),
-        { enableHighAccuracy: true }
-      );
     }
   </script>
 </body>
