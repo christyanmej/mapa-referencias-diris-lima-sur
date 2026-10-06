@@ -467,11 +467,15 @@
     function abrirModalEditar(codRen) {
       const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRen).trim());
       if (!feature) return;
-
+    
       const p = feature.properties;
-      document.getElementById('editCodRen').value = p.cod_ren;
+      
+      // Aseguramos asignación del cod_ren a ambos IDs posibles para evitar fallos
+      if (document.getElementById('editCodRen')) document.getElementById('editCodRen').value = p.cod_ren;
+      if (document.getElementById('editId')) document.getElementById('editId').value = p.cod_ren;
+      
       document.getElementById('editNombre').value = p.eess || '';
-      document.getElementById('editClave').value = ''; // Limpiar contraseña por seguridad
+      document.getElementById('editClave').value = ''; // Limpiar clave
       
       document.getElementById('editTipoAtencion').value = (p.tipo_atencion || 'UVICLIN').toUpperCase().trim();
       document.getElementById('editEstado').value = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
@@ -479,11 +483,11 @@
       document.getElementById('editCamasOcup').value = p.camas_ocupadas || 0;
       document.getElementById('editCamasDisp').value = p.camas_disponibles || 0;
       document.getElementById('editCamasMosq').value = p.camas_mosquiteros || 0;
-
+    
       document.getElementById('editCamillasOcup').value = p.camillas_ocupadas || 0;
       document.getElementById('editCamillasDisp').value = p.camillas_disponibles || 0;
       document.getElementById('editCamillasMosq').value = p.camillas_mosquiteros || 0;
-
+    
       document.getElementById('editTelEESS').value = p.telefono_eess || '';
       document.getElementById('editJefeEESS').value = p.jefe_eess || '';
       document.getElementById('editTelJefe').value = p.telefono_jefe_eess || '';
@@ -494,20 +498,28 @@
       document.getElementById('editRRHH').value = p.rrhh || '';
       document.getElementById('editEspacioCamas').value = p.espacio_camas || '';
       document.getElementById('editObservacion').value = p.observación || p.observacion || '';
-
+    
       document.getElementById('modalEESS').style.display = 'flex';
     }
-
+    
     function guardarFormularioEESS(event) {
       event.preventDefault();
-      const codRenTarget = document.getElementById('editCodRen').value.trim();
+      
+      // Leer cod_ren intentando ambos IDs
+      const elemCodRen = document.getElementById('editCodRen') || document.getElementById('editId');
+      const codRenTarget = elemCodRen ? elemCodRen.value.trim() : "";
       const claveIngresada = document.getElementById('editClave').value.trim();
       const btnGuardar = document.getElementById('btnGuardarModal');
     
-      // VERIFICACIÓN PREVIA DE SEGURIDAD
+      // Validar clave en el navegador
       if (claveIngresada !== "6c07") {
         alert("❌ Error: La clave de edición es incorrecta. No se realizaron cambios.");
         document.getElementById('editClave').focus();
+        return;
+      }
+    
+      if (!codRenTarget) {
+        alert("❌ Error: No se pudo identificar el Código RENAES del establecimiento.");
         return;
       }
     
@@ -545,9 +557,9 @@
         body: JSON.stringify(payload)
       })
       .then(() => {
-        alert("✅ ¡Éxito! Clave validada y datos actualizados en Google Sheets.");
+        alert("✅ ¡Éxito! Clave validada y datos guardados correctamente en Google Sheets.");
         
-        // Actualizar la memoria del GeoJSON inmediatamente
+        // Actualizar datos en memoria para respuesta inmediata en la web
         const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
         if (feature) {
           Object.assign(feature.properties, payload);
@@ -559,16 +571,12 @@
         filtrarEstablecimientos();
       })
       .catch(err => {
-        alert("❌ Error al conectar con Google Sheets: " + err);
+        alert("❌ Error de conexión al guardar: " + err);
       })
       .finally(() => {
         btnGuardar.innerText = "Guardar Cambios";
         btnGuardar.disabled = false;
       });
-    }
-
-    function cerrarModal() {
-      document.getElementById('modalEESS').style.display = 'none';
     }
 
     // 5. Controles Auxiliares
