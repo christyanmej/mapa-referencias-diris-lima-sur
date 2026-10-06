@@ -162,10 +162,19 @@
   <div class="controls-container">
     <button class="btn-control" onclick="obtenerUbicacionGPS()">📍 Mi Ubicación GPS</button>
     <button id="btnToggleLabels" class="btn-control btn-toggle-labels" onclick="toggleEtiquetas()">🏷️ Etiquetas: OFF</button>
-    <select id="selectTipoAtencion" class="select-tipo" onchange="filtrarPorTipoAtencion()">
-      <option value="TODOS">🔍 Mostrar Todos los EESS</option>
+    
+    <!-- Filtro por Tipo de Atención -->
+    <select id="selectTipoAtencion" class="select-tipo" onchange="filtrarEstablecimientos()">
+      <option value="TODOS">🔍 Mostrar Todos los Tipos</option>
       <option value="UVICLIN">🏥 Solo UVICLIN</option>
       <option value="UNIDAD FEBRIL">🌡️ Solo UNIDAD FEBRIL</option>
+    </select>
+
+    <!-- NUEVO: Filtro por Estado (Por defecto ACTIVO) -->
+    <select id="selectEstado" class="select-tipo" onchange="filtrarEstablecimientos()">
+      <option value="ACTIVO" selected>✅ Solo EESS ACTIVOS</option>
+      <option value="TODOS">🌐 Mostrar Todos (Activos e Inactivos)</option>
+      <option value="INACTIVO">⚠️ Solo EESS INACTIVOS</option>
     </select>
   </div>
 
@@ -384,15 +393,32 @@
           alert("Atención: Ocurrió un error de red o de conexión con la URL de Apps Script.");
         });
     }
+    
+    // 1. Nueva función unificada de filtrado
+    function filtrarEstablecimientos() {
+      if (rutaLayer) map.removeLayer(rutaLayer);
+      const tipoSeleccionado = document.getElementById('selectTipoAtencion').value;
+      const estadoSeleccionado = document.getElementById('selectEstado').value;
+    
+      renderizarMapa(tipoSeleccionado, estadoSeleccionado);
+    }
 
-    // 3. Renderizar Capa en el Mapa
-    function renderizarMapa(filtroTipo = "TODOS") {
+    // 2. Renderizar capa aplicando ambos filtros
+    function renderizarMapa(filtroTipo = "TODOS", filtroEstado = "ACTIVO") {
       if (geojsonLayer) map.removeLayer(geojsonLayer);
       if (!eessGeoJSON) return;
 
       const featuresFiltrados = eessGeoJSON.features.filter(f => {
-        if (filtroTipo === "TODOS") return true;
-        return f.properties.tipo_atencion === filtroTipo;
+        const p = f.properties;
+        
+        // Evaluar Tipo de Atención
+        const cumpleTipo = (filtroTipo === "TODOS") || (p.tipo_atencion === filtroTipo);
+        
+        // Evaluar Estado (Normalizar a mayúsculas para evitar desfases)
+        const estadoReal = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+        const cumpleEstado = (filtroEstado === "TODOS") || (estadoReal === filtroEstado);
+
+        return cumpleTipo && cumpleEstado;
       });
 
       const labelClass = etiquetasVisibles ? 'label-eess' : 'label-eess label-eess-hidden';
@@ -410,6 +436,8 @@
           if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
           if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
 
+          const estadoTexto = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+
           layer.bindTooltip(p.eess || p.NOM_EESS_RECOR || '', {
             permanent: true, direction: 'bottom', offset: [0, 8], className: labelClass
           });
@@ -417,7 +445,8 @@
           const popupContent = `
             <div class="popup-eess">
               <b>${p.eess}</b><br>
-              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span><br>
+              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span> 
+              <b style="color: ${estadoTexto === 'ACTIVO' ? '#28a745' : '#dc3545'};">[${estadoTexto}]</b><br>
               <b>Código RENAES:</b> ${p.cod_ren}<br>
               <b>RIS:</b> ${p.ris || ''}<br>
               <b>Camas Totales:</b> ${p.camas_totales || 0} (Ocup: ${p.camas_ocupadas || 0} / Disp: ${p.camas_disponibles || 0})<br>
@@ -430,6 +459,68 @@
           layer.bindPopup(popupContent);
         }
       }).addTo(map);
+    }
+
+    // 3. Ajustar el cálculo de rutas para considerar los establecimientos visibles actualmente
+    function calcularRutaEESSMasCercano(userLngLat) {
+      const filtroTipo = document.getElementById('selectTipoAtencion').value;
+      const filtroEstado = document.getElementById('selectEstado').value;
+
+      const featuresVisibles = eessGeoJSON.features.filter(f => {
+        const p = f.properties;
+        const cumpleTipo = (filtroTipo === "TODOS") || (p.tipo_atencion === filtroTipo);
+        const estadoReal = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+        const cumpleEstado = (filtroEstado === "TODOS") || (estadoReal === filtroEstado);
+        return cumpleTipo && cumpleEstado;
+      });
+
+      if (featuresVisibles.length === 0) {
+        alert("No hay establecimientos disponibles con los filtros seleccionados.");
+        return;
+      }
+
+      const geojsonEvaluar = turf.featureCollection(featuresVisibles);
+      const origenTurf = turf.point(userLngLat);
+      const masCercano = turf.nearestPoint(origenTurf, geojsonEvaluar);
+      const destinoCoords = masCercano.geometry.coordinates;
+      const p = masCercano.properties;
+
+      const url = `https://router.project-osrm.org/route/v1/driving/${userLngLat[0]},${userLngLat[1]};${destinoCoords[0]},${destinoCoords[1]}?overview=full&geometries=geojson`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.routes && data.routes.length > 0) {
+            if (rutaLayer) map.removeLayer(rutaLayer);
+
+            const geometry = data.routes[0].geometry;
+            const duracionMin = Math.round(data.routes[0].duration / 60);
+            const distanciaKm = (data.routes[0].distance / 1000).toFixed(2);
+
+            rutaLayer = L.geoJSON(geometry, { style: { color: '#0055ff', weight: 6, opacity: 0.85 } }).addTo(map);
+
+            let badgeClass = 'badge badge-default';
+            if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
+            if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
+
+            L.popup({
+              offset: [0, -35],
+              autoPan: true,
+              autoPanPadding: [20, 20]
+            })
+              .setLatLng([destinoCoords[1], destinoCoords[0]])
+              .setContent(`
+                <div class="popup-eess">
+                  <b>EESS Más Cercano:</b> ${p.eess}<br>
+                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span><br>
+                  <b>RIS:</b> ${p.ris || ''}<hr>
+                  <b>Distancia vial:</b> ${distanciaKm} km<br>
+                  <b>Tiempo estimado:</b> ${duracionMin} minutos
+                </div>
+              `)
+              .openOn(map);
+          }
+        });
     }
 
     // 4. Modal y Edición
@@ -579,62 +670,6 @@
         (error) => alert("Error al obtener GPS: " + error.message),
         { enableHighAccuracy: true }
       );
-    }
-
-    function calcularRutaEESSMasCercano(userLngLat) {
-      const filtroActual = document.getElementById('selectTipoAtencion').value;
-      const featuresVisibles = eessGeoJSON.features.filter(f => {
-        if (filtroActual === "TODOS") return true;
-        return f.properties.tipo_atencion === filtroActual;
-      });
-
-      if (featuresVisibles.length === 0) {
-        alert("No hay establecimientos disponibles para el filtro seleccionado.");
-        return;
-      }
-
-      const geojsonEvaluar = turf.featureCollection(featuresVisibles);
-      const origenTurf = turf.point(userLngLat);
-      const masCercano = turf.nearestPoint(origenTurf, geojsonEvaluar);
-      const destinoCoords = masCercano.geometry.coordinates;
-      const p = masCercano.properties;
-
-      const url = `https://router.project-osrm.org/route/v1/driving/${userLngLat[0]},${userLngLat[1]};${destinoCoords[0]},${destinoCoords[1]}?overview=full&geometries=geojson`;
-
-      fetch(url)
-        .then(res => res.json())
-        .then(data => {
-          if (data.routes && data.routes.length > 0) {
-            if (rutaLayer) map.removeLayer(rutaLayer);
-
-            const geometry = data.routes[0].geometry;
-            const duracionMin = Math.round(data.routes[0].duration / 60);
-            const distanciaKm = (data.routes[0].distance / 1000).toFixed(2);
-
-            rutaLayer = L.geoJSON(geometry, { style: { color: '#0055ff', weight: 6, opacity: 0.85 } }).addTo(map);
-
-            let badgeClass = 'badge badge-default';
-            if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
-            if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
-
-            L.popup({
-              offset: [0, -35],
-              autoPan: true,
-              autoPanPadding: [20, 20]
-            })
-              .setLatLng([destinoCoords[1], destinoCoords[0]])
-              .setContent(`
-                <div class="popup-eess">
-                  <b>EESS Más Cercano (${filtroActual}):</b> ${p.eess}<br>
-                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span><br>
-                  <b>RIS:</b> ${p.ris || ''}<hr>
-                  <b>Distancia vial:</b> ${distanciaKm} km<br>
-                  <b>Tiempo estimado:</b> ${duracionMin} minutos
-                </div>
-              `)
-              .openOn(map);
-          }
-        });
     }
   </script>
 </body>
