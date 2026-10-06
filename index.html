@@ -463,19 +463,20 @@
       }).addTo(map);
     }
 
-    // 4. Modal y Edición
+    // 4. Cierre del modal
+    function cerrarModal() {
+      document.getElementById('modalEESS').style.display = 'none';
+    }
+
+    // 5. Modal y Edición
     function abrirModalEditar(codRen) {
       const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRen).trim());
       if (!feature) return;
-    
+
       const p = feature.properties;
-      
-      // Aseguramos asignación del cod_ren a ambos IDs posibles para evitar fallos
-      if (document.getElementById('editCodRen')) document.getElementById('editCodRen').value = p.cod_ren;
-      if (document.getElementById('editId')) document.getElementById('editId').value = p.cod_ren;
-      
+      document.getElementById('editCodRen').value = p.cod_ren;
       document.getElementById('editNombre').value = p.eess || '';
-      document.getElementById('editClave').value = ''; // Limpiar clave
+      document.getElementById('editClave').value = ''; // Limpiar campo clave
       
       document.getElementById('editTipoAtencion').value = (p.tipo_atencion || 'UVICLIN').toUpperCase().trim();
       document.getElementById('editEstado').value = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
@@ -483,11 +484,11 @@
       document.getElementById('editCamasOcup').value = p.camas_ocupadas || 0;
       document.getElementById('editCamasDisp').value = p.camas_disponibles || 0;
       document.getElementById('editCamasMosq').value = p.camas_mosquiteros || 0;
-    
+
       document.getElementById('editCamillasOcup').value = p.camillas_ocupadas || 0;
       document.getElementById('editCamillasDisp').value = p.camillas_disponibles || 0;
       document.getElementById('editCamillasMosq').value = p.camillas_mosquiteros || 0;
-    
+
       document.getElementById('editTelEESS').value = p.telefono_eess || '';
       document.getElementById('editJefeEESS').value = p.jefe_eess || '';
       document.getElementById('editTelJefe').value = p.telefono_jefe_eess || '';
@@ -498,24 +499,26 @@
       document.getElementById('editRRHH').value = p.rrhh || '';
       document.getElementById('editEspacioCamas').value = p.espacio_camas || '';
       document.getElementById('editObservacion').value = p.observación || p.observacion || '';
-    
+
       document.getElementById('modalEESS').style.display = 'flex';
     }
-    
+
     function guardarFormularioEESS(event) {
       event.preventDefault();
       const codRenTarget = document.getElementById('editCodRen').value;
       const claveIngresada = document.getElementById('editClave').value.trim();
       const btnGuardar = document.getElementById('btnGuardarModal');
-    
-      // Validar clave en el navegador
+
+      // Validar clave de seguridad
       if (claveIngresada !== "6c07") {
         alert("❌ Error: La clave de edición es incorrecta. No se realizaron cambios.");
         document.getElementById('editClave').focus();
         return;
       }
-    
-    const payload = {
+
+      const txtObs = document.getElementById('editObservacion').value || "";
+
+      const payload = {
         cod_ren: codRenTarget,
         clave: claveIngresada,
         tipo_atencion: document.getElementById('editTipoAtencion').value,
@@ -526,8 +529,6 @@
         camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
         camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
         camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
-        
-        // Todos estos campos administrativos DEBEN estar incluidos aquí:
         telefono_eess: document.getElementById('editTelEESS').value || "",
         jefe_eess: document.getElementById('editJefeEESS').value || "",
         telefono_jefe_eess: document.getElementById('editTelJefe').value || "",
@@ -537,12 +538,13 @@
         brigadas: document.getElementById('editBrigadas').value || "",
         rrhh: document.getElementById('editRRHH').value || "",
         espacio_camas: document.getElementById('editEspacioCamas').value || "",
-        observación: document.getElementById('editObservacion').value || ""
+        observación: txtObs,
+        observacion: txtObs
       };
-    
+
       btnGuardar.innerText = "Guardando...";
       btnGuardar.disabled = true;
-    
+
       fetch(URL_WEB_APP, {
         method: 'POST',
         mode: 'no-cors',
@@ -552,14 +554,14 @@
       .then(() => {
         alert("✅ ¡Éxito! Clave validada y cambios guardados correctamente en Google Sheets.");
         
-        // Actualizar memoria local para vista inmediata en el mapa
+        // Actualizar datos en la memoria del mapa
         const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
         if (feature) {
           Object.assign(feature.properties, payload);
           feature.properties.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
           feature.properties.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
         }
-    
+
         cerrarModal();
         filtrarEstablecimientos();
       })
@@ -572,7 +574,7 @@
       });
     }
 
-    // 5. Controles Auxiliares
+    // 6. Controles Auxiliares
     function toggleEtiquetas() {
       etiquetasVisibles = !etiquetasVisibles;
       const btn = document.getElementById('btnToggleLabels');
@@ -589,7 +591,7 @@
       }
     }
 
-    // 6. GPS y Ruteo OSRM
+    // 7. GPS y Ruteo OSRM
     function obtenerUbicacionGPS() {
       if (!navigator.geolocation) {
         alert("Tu navegador no soporta geolocalización por GPS.");
