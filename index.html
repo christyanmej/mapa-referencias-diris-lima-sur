@@ -526,16 +526,18 @@
         camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
         camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
         camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
-        telefono_eess: document.getElementById('editTelEESS').value,
-        jefe_eess: document.getElementById('editJefeEESS').value,
-        telefono_jefe_eess: document.getElementById('editTelJefe').value,
-        correo_eess: document.getElementById('editCorreoEESS').value,
-        horario_uvi: document.getElementById('editHorarioUVI').value,
-        dias_atencion: document.getElementById('editDiasAtencion').value,
-        brigadas: document.getElementById('editBrigadas').value,
-        rrhh: document.getElementById('editRRHH').value,
-        espacio_camas: document.getElementById('editEspacioCamas').value,
-        observación: document.getElementById('editObservacion').value // <--- Propiedad enviada con la tilde exacta
+        
+        // Todos estos campos administrativos DEBEN estar incluidos aquí:
+        telefono_eess: document.getElementById('editTelEESS').value || "",
+        jefe_eess: document.getElementById('editJefeEESS').value || "",
+        telefono_jefe_eess: document.getElementById('editTelJefe').value || "",
+        correo_eess: document.getElementById('editCorreoEESS').value || "",
+        horario_uvi: document.getElementById('editHorarioUVI').value || "",
+        dias_atencion: document.getElementById('editDiasAtencion').value || "",
+        brigadas: document.getElementById('editBrigadas').value || "",
+        rrhh: document.getElementById('editRRHH').value || "",
+        espacio_camas: document.getElementById('editEspacioCamas').value || "",
+        observación: document.getElementById('editObservacion').value || ""
       };
     
       btnGuardar.innerText = "Guardando...";
