@@ -509,7 +509,6 @@
       const claveIngresada = document.getElementById('editClave').value.trim();
       const btnGuardar = document.getElementById('btnGuardarModal');
 
-      // Validar clave de seguridad
       if (claveIngresada !== "6c07") {
         alert("❌ Error: La clave de edición es incorrecta. No se realizaron cambios.");
         document.getElementById('editClave').focus();
@@ -554,7 +553,7 @@
       .then(() => {
         alert("✅ ¡Éxito! Clave validada y cambios guardados correctamente en Google Sheets.");
         
-        // Actualizar datos en la memoria del mapa
+        // Actualizar datos en la memoria local del mapa
         const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
         if (feature) {
           Object.assign(feature.properties, payload);
