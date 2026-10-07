@@ -178,11 +178,20 @@
     </select>
   </div>
 
-  <!-- Leyenda del Mapa -->
+<!-- Leyenda del Mapa con Contadores -->
   <div class="legend">
-    <div class="legend-title">Simbología EESS</div>
-    <div class="legend-item"><img src="uviclin.png" alt="UVICLIN" onerror="this.src='https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png'"> UVICLIN</div>
-    <div class="legend-item"><img src="unidad febril.png" alt="UNIDAD FEBRIL" onerror="this.src='https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png'"> UNIDAD FEBRIL</div>
+    <div class="legend-title">Simbología y Resumen EESS</div>
+    <div class="legend-item">
+      <img src="uviclin.png" alt="UVICLIN" onerror="this.src='https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png'"> 
+      UVICLIN: <span id="cantUviclin" class="badge badge-uviclin">0</span>
+    </div>
+    <div class="legend-item">
+      <img src="unidad febril.png" alt="UNIDAD FEBRIL" onerror="this.src='https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png'"> 
+      UNIDAD FEBRIL: <span id="cantFebril" class="badge badge-febril">0</span>
+    </div>
+    <div style="margin-top: 5px; border-top: 1px solid #ddd; padding-top: 4px; font-weight: bold; font-size: 11px; color: #0056b3;">
+      Total visibles: <span id="cantTotal">0</span>
+    </div>
   </div>
 
   <!-- Modal para Formulario de Edición -->
