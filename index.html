@@ -507,14 +507,15 @@
       document.getElementById('editBrigadas').value = p.brigadas || '';
       document.getElementById('editRRHH').value = p.rrhh || '';
       document.getElementById('editEspacioCamas').value = p.espacio_camas || '';
-      document.getElementById('editObservacion').value = p.observación || p.observacion || '';
+      document.getElementById('editObservacion').value = p.observacion || '';
 
       document.getElementById('modalEESS').style.display = 'flex';
     }
 
     function guardarFormularioEESS(event) {
       event.preventDefault();
-      const codRenTarget = document.getElementById('editCodRen').value;
+
+      const codRenTarget = document.getElementById('editCodRen').value.trim();
       const claveIngresada = document.getElementById('editClave').value.trim();
       const btnGuardar = document.getElementById('btnGuardarModal');
 
@@ -524,31 +525,42 @@
         return;
       }
 
-      const txtObs = document.getElementById('editObservacion').value || "";
-
+      // Los nombres técnicos coinciden con los CAMPOS de Google Sheets.
+      // No usar tildes en las claves del payload.
       const payload = {
         cod_ren: codRenTarget,
         clave: claveIngresada,
-        tipo_atencion: document.getElementById('editTipoAtencion').value,
-        estado_uviclin: document.getElementById('editEstado').value,
-        camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
-        camas_disponibles: parseInt(document.getElementById('editCamasDisp').value) || 0,
-        camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value) || 0,
-        camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
-        camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
-        camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
+
+        fecha: new Date().toISOString(),
+        tipo_atencion: document.getElementById('editTipoAtencion').value || "",
+        estado_uviclin: document.getElementById('editEstado').value || "",
+        camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value, 10) || 0,
+        camas_disponibles: parseInt(document.getElementById('editCamasDisp').value, 10) || 0,
+        camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value, 10) || 0,
+        camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value, 10) || 0,
+        camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value, 10) || 0,
+        camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value, 10) || 0,
+        espacio_camas: document.getElementById('editEspacioCamas').value || "",
+
+        // T:AB
+        observacion: document.getElementById('editObservacion').value || "",
+        brigadas: document.getElementById('editBrigadas').value || "",
+        rrhh: document.getElementById('editRRHH').value || "",
+        horario_uvi: document.getElementById('editHorarioUVI').value || "",
         telefono_eess: document.getElementById('editTelEESS').value || "",
         jefe_eess: document.getElementById('editJefeEESS').value || "",
         telefono_jefe_eess: document.getElementById('editTelJefe').value || "",
-        correo_eess: document.getElementById('editCorreoEESS').value || "",
-        horario_uvi: document.getElementById('editHorarioUVI').value || "",
         dias_atencion: document.getElementById('editDiasAtencion').value || "",
-        brigadas: document.getElementById('editBrigadas').value || "",
-        rrhh: document.getElementById('editRRHH').value || "",
-        espacio_camas: document.getElementById('editEspacioCamas').value || "",
-        observación: txtObs,
-        observacion: txtObs
+        correo_eess: document.getElementById('editCorreoEESS').value || ""
       };
+
+      // Calculados
+      payload.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
+      payload.porc_ocupacion = payload.camas_totales > 0
+        ? payload.camas_ocupadas / payload.camas_totales : 0;
+      payload.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
+      payload.porc_ocup_camill = payload.camillas_totales > 0
+        ? payload.camillas_ocupadas / payload.camillas_totales : 0;
 
       btnGuardar.innerText = "Guardando...";
       btnGuardar.disabled = true;
@@ -560,21 +572,20 @@
         body: JSON.stringify(payload)
       })
       .then(() => {
-        alert("✅ ¡Éxito! Clave validada y cambios guardados correctamente en Google Sheets.");
-        
-        // Actualizar datos en la memoria local del mapa
-        const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
-        if (feature) {
-          Object.assign(feature.properties, payload);
-          feature.properties.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
-          feature.properties.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
-        }
+        alert("✅ Solicitud enviada. Verifica Google Sheets para confirmar la actualización.");
+
+        const feature = eessGeoJSON.features.find(
+          f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim()
+        );
+
+        if (feature) Object.assign(feature.properties, payload);
 
         cerrarModal();
         filtrarEstablecimientos();
       })
       .catch(err => {
-        alert("❌ Error al guardar: " + err);
+        console.error(err);
+        alert("❌ Error al enviar los cambios: " + err);
       })
       .finally(() => {
         btnGuardar.innerText = "Guardar Cambios";
