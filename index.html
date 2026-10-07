@@ -1,141 +1,685 @@
-// 1. LECTURA DE DATOS PARA EL MAPA (doGet)
-function doGet(e) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("EESS_CAMAS") || ss.getSheetByName("EESS_CAMAS_2026") || ss.getSheets()[0];
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buscador y Editor de EESS - DIRIS Lima Sur</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Turf.js para análisis espacial -->
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    #map { width: 100vw; height: 100vh; }
     
-    const lastRow = sheet.getLastRow();
-    const lastCol = sheet.getLastColumn();
-    if (lastRow <= 1) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    /* Etiquetas para EESS */
+    .label-eess {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid #0056b3 !important;
+      border-radius: 3px !important;
+      color: #111 !important;
+      font-weight: 600 !important;
+      font-size: 8.5px !important;
+      line-height: 1.1 !important;
+      padding: 1px 3px !important;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+      max-width: 85px !important;
+      white-space: normal !important;
+      text-align: center !important;
+      word-wrap: break-word !important;
+    }
+    .label-eess-hidden { display: none !important; }
 
-    const data = sheet.getRange(1, 1, lastRow, lastCol).getDisplayValues();
-    const headers = data[0].map(h => String(h).trim());
+    /* Panel de controles */
+    .controls-container {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
     
-    const rows = [];
-    for (let i = 1; i < data.length; i++) {
-      let obj = {};
-      let rowData = data[i];
-      headers.forEach((header, index) => {
-        if (header) obj[header] = rowData[index];
+    .btn-control {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 9px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 12px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+      transition: background 0.2s, transform 0.1s;
+      width: 100%;
+      text-align: center;
+    }
+    .btn-control:hover { background: #0056b3; }
+    .btn-control:active { transform: scale(0.98); }
+    .btn-toggle-labels { background: #6c757d; }
+    .btn-toggle-labels.active { background: #28a745; }
+
+    .select-tipo {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      cursor: pointer;
+      outline: none;
+      width: 100%;
+    }
+
+    /* Popups y Formularios */
+    .popup-eess { font-size: 12px; line-height: 1.4; color: #333; }
+    .popup-eess b { color: #0056b3; }
+    .btn-edit-popup {
+      margin-top: 8px;
+      background: #ffc107;
+      color: #212529;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 11px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: bold;
+      color: white;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+    .badge-uviclin { background-color: #f2470a; }
+    .badge-febril { background-color: #11bf87; }
+    .badge-default { background-color: #6c757d; }
+
+    /* Modal de Edición */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 18px;
+      border-radius: 8px;
+      width: 380px;
+      max-width: 92%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .modal-content h3 { margin-top: 0; color: #0056b3; font-size: 15px; border-bottom: 2px solid #0056b3; padding-bottom: 5px; }
+    .form-group { margin-bottom: 8px; }
+    .form-group label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 2px; color: #444; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 11px;
+    }
+    .form-group input[readonly] { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
+    .form-row { display: flex; gap: 8px; }
+    .form-row .form-group { flex: 1; }
+    
+    .modal-buttons { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-save { background: #28a745; color: white; border: none; padding: 8px; border-radius: 4px; flex: 1; font-weight: bold; cursor: pointer; }
+    .btn-cancel { background: #dc3545; color: white; border: none; padding: 8px; border-radius: 4px; flex: 1; font-weight: bold; cursor: pointer; }
+
+    /* Leyenda */
+    .legend {
+      position: absolute;
+      bottom: 25px;
+      left: 15px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .legend-title { font-weight: bold; margin-bottom: 4px; color: #222; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-item img { width: 20px; height: 20px; object-fit: contain; }
+  </style>
+</head>
+<body>
+
+  <!-- Contenedor de Controles Flotantes -->
+  <div class="controls-container">
+    <button class="btn-control" onclick="obtenerUbicacionGPS()">📍 Mi Ubicación GPS</button>
+    <button id="btnToggleLabels" class="btn-control btn-toggle-labels" onclick="toggleEtiquetas()">🏷️ Etiquetas: OFF</button>
+    
+    <!-- Filtro por Tipo de Atención -->
+    <select id="selectTipoAtencion" class="select-tipo" onchange="filtrarEstablecimientos()">
+      <option value="TODOS">🔍 Mostrar Todos los Tipos</option>
+      <option value="UVICLIN">🏥 Solo UVICLIN</option>
+      <option value="UNIDAD FEBRIL">🌡️ Solo UNIDAD FEBRIL</option>
+    </select>
+
+    <!-- Filtro por Estado (Por defecto ACTIVO) -->
+    <select id="selectEstado" class="select-tipo" onchange="filtrarEstablecimientos()">
+      <option value="ACTIVO" selected>✅ Solo EESS ACTIVOS</option>
+      <option value="TODOS">🌐 Mostrar Todos (Activos e Inactivos)</option>
+      <option value="INACTIVO">⚠️ Solo EESS INACTIVOS</option>
+    </select>
+  </div>
+
+  <!-- Leyenda del Mapa -->
+  <div class="legend">
+    <div class="legend-title">Simbología EESS</div>
+    <div class="legend-item"><img src="uviclin.png" alt="UVICLIN" onerror="this.src='https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png'"> UVICLIN</div>
+    <div class="legend-item"><img src="unidad febril.png" alt="UNIDAD FEBRIL" onerror="this.src='https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png'"> UNIDAD FEBRIL</div>
+  </div>
+
+  <!-- Modal para Formulario de Edición -->
+  <div id="modalEESS" class="modal-overlay">
+    <div class="modal-content">
+      <h3>Editar Establecimiento</h3>
+      <form id="formEESS" onsubmit="guardarFormularioEESS(event)">
+        <!-- Campo oculto para cod_ren -->
+        <input type="hidden" id="editCodRen">
+        
+        <div class="form-group">
+          <label>Establecimiento (No editable):</label>
+          <input type="text" id="editNombre" readonly>
+        </div>
+  
+        <!-- Campo de Clave de Seguridad -->
+        <div class="form-group" style="background: #fff3cd; padding: 8px; border-radius: 6px; border: 1px solid #ffeeba; margin-bottom: 12px;">
+          <label style="color: #856404;">🔑 Clave de Edición (Requerida):</label>
+          <input type="password" id="editClave" placeholder="Ingresa la clave para guardar" required>
+        </div>
+  
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tipo Atención:</label>
+            <select id="editTipoAtencion">
+              <option value="UVICLIN">UVICLIN</option>
+              <option value="UNIDAD FEBRIL">UNIDAD FEBRIL</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Estado:</label>
+            <select id="editEstado">
+              <option value="ACTIVO">ACTIVO</option>
+              <option value="INACTIVO">INACTIVO</option>
+            </select>
+          </div>
+        </div>
+  
+        <!-- Camas -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Camas Ocupadas:</label>
+            <input type="number" id="editCamasOcup" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camas Disponibles:</label>
+            <input type="number" id="editCamasDisp" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camas Mosquiteros:</label>
+            <input type="number" id="editCamasMosq" min="0">
+          </div>
+        </div>
+  
+        <!-- Camillas -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Camillas Ocupadas:</label>
+            <input type="number" id="editCamillasOcup" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camillas Disponibles:</label>
+            <input type="number" id="editCamillasDisp" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Camillas Mosquiteros:</label>
+            <input type="number" id="editCamillasMosq" min="0">
+          </div>
+        </div>
+  
+        <!-- Contacto y Datos Administrativos -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Teléfono EESS:</label>
+            <input type="text" id="editTelEESS">
+          </div>
+          <div class="form-group">
+            <label>Jefe del EESS:</label>
+            <input type="text" id="editJefeEESS">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Teléfono Jefe:</label>
+            <input type="text" id="editTelJefe">
+          </div>
+          <div class="form-group">
+            <label>Correo EESS:</label>
+            <input type="email" id="editCorreoEESS">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Horario UVI:</label>
+            <input type="text" id="editHorarioUVI">
+          </div>
+          <div class="form-group">
+            <label>Días Atención:</label>
+            <input type="text" id="editDiasAtencion">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Brigadas:</label>
+            <input type="text" id="editBrigadas">
+          </div>
+          <div class="form-group">
+            <label>Recurso Humano:</label>
+            <input type="text" id="editRRHH">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Espacio Adicional Camas:</label>
+          <input type="text" id="editEspacioCamas">
+        </div>
+
+        <div class="form-group">
+          <label>Observaciones:</label>
+          <textarea id="editObservacion" rows="2"></textarea>
+        </div>
+        
+        <div class="modal-buttons">
+          <button type="submit" id="btnGuardarModal" class="btn-save">Guardar Cambios</button>
+          <button type="button" class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>  
+
+  <div id="map"></div>
+
+  <script>
+    // URL del Google Apps Script desplegado
+    const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbyz5KzvSzG_bMZauYnd_bc5TkqzCdsad5m9pax2V19YhdY4PL7nmVLKvQwkvX0lrgyM/exec";
+
+    // 1. Configuración de mapa base
+    const map = L.map('map').setView([-12.203, -76.973], 12);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18,
+      attribution: 'Tiles © Esri'
+    }).addTo(map);
+
+    let eessGeoJSON = null;      // Estructura GeoJSON en memoria
+    let geojsonLayer = null;     // Capa gráfica Leaflet
+    let userMarker = null;
+    let rutaLayer = null;
+    let etiquetasVisibles = false;
+
+    // Iconos personalizados
+    const iconUviclin = L.icon({
+      iconUrl: 'uviclin.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -30]
+    });
+
+    const iconFebril = L.icon({
+      iconUrl: 'unidad febril.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -30]
+    });
+
+    const iconDefault = L.icon({
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+    });
+
+    // 2. Cargar dinámicamente desde Google Sheets
+    cargarDatosDesdeSheets();
+
+    function cargarDatosDesdeSheets() {
+      fetch(URL_WEB_APP, {
+        method: 'GET',
+        redirect: 'follow'
+      })
+        .then(res => res.json())
+        .then(dataRows => {
+          if (!Array.isArray(dataRows) || dataRows.length === 0) {
+            alert("Atención: Google Sheets respondió pero no devolvió ningún registro.");
+            return;
+          }
+
+          const features = [];
+
+          dataRows.forEach((row, index) => {
+            let rawY = row.Y !== undefined ? row.Y : (row.y !== undefined ? row.y : "");
+            let rawX = row.X !== undefined ? row.X : (row.x !== undefined ? row.x : "");
+
+            let strY = String(rawY).trim().replace(',', '.');
+            let strX = String(rawX).trim().replace(',', '.');
+
+            let lat = parseFloat(strY);
+            let lng = parseFloat(strX);
+
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+              features.push(turf.point([lng, lat], row));
+            }
+          });
+
+          if (features.length === 0) {
+            alert("Se recibieron datos de Google Sheets, pero ninguna fila contenía coordenadas X e Y válidas.");
+            return;
+          }
+
+          eessGeoJSON = turf.featureCollection(features);
+          filtrarEstablecimientos();
+        })
+        .catch(err => {
+          console.error("Error al cargar desde Google Sheets:", err);
+          alert("Atención: Ocurrió un error de red o de conexión con la URL de Apps Script.");
+        });
+    }
+
+    // 3. Filtrado combinado de Tipo y Estado
+    function filtrarEstablecimientos() {
+      if (rutaLayer) map.removeLayer(rutaLayer);
+      const tipoSeleccionado = document.getElementById('selectTipoAtencion').value;
+      const estadoSeleccionado = document.getElementById('selectEstado').value;
+    
+      renderizarMapa(tipoSeleccionado, estadoSeleccionado);
+    }
+
+    function renderizarMapa(filtroTipo = "TODOS", filtroEstado = "ACTIVO") {
+      if (geojsonLayer) map.removeLayer(geojsonLayer);
+      if (!eessGeoJSON) return;
+
+      const featuresFiltrados = eessGeoJSON.features.filter(f => {
+        const p = f.properties;
+        const cumpleTipo = (filtroTipo === "TODOS") || (p.tipo_atencion === filtroTipo);
+        const estadoReal = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+        const cumpleEstado = (filtroEstado === "TODOS") || (estadoReal === filtroEstado);
+
+        return cumpleTipo && cumpleEstado;
       });
-      rows.push(obj);
+
+      const labelClass = etiquetasVisibles ? 'label-eess' : 'label-eess label-eess-hidden';
+
+      geojsonLayer = L.geoJSON(turf.featureCollection(featuresFiltrados), {
+        pointToLayer: function (feature, latlng) {
+          const tipo = feature.properties.tipo_atencion;
+          if (tipo === "UVICLIN") return L.marker(latlng, { icon: iconUviclin });
+          if (tipo === "UNIDAD FEBRIL") return L.marker(latlng, { icon: iconFebril });
+          return L.marker(latlng, { icon: iconDefault });
+        },
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+          let badgeClass = 'badge badge-default';
+          if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
+          if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
+
+          const estadoTexto = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+
+          layer.bindTooltip(p.eess || p.NOM_EESS_RECOR || '', {
+            permanent: true, direction: 'bottom', offset: [0, 8], className: labelClass
+          });
+
+          const popupContent = `
+            <div class="popup-eess">
+              <b>${p.eess}</b><br>
+              <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span> 
+              <b style="color: ${estadoTexto === 'ACTIVO' ? '#28a745' : '#dc3545'};">[${estadoTexto}]</b><br>
+              <b>Código RENAES:</b> ${p.cod_ren}<br>
+              <b>RIS:</b> ${p.ris || ''}<br>
+              <b>Camas Totales:</b> ${p.camas_totales || 0} (Ocup: ${p.camas_ocupadas || 0} / Disp: ${p.camas_disponibles || 0})<br>
+              <b>Camillas Totales:</b> ${p.camillas_totales || 0} (Ocup: ${p.camillas_ocupadas || 0} / Disp: ${p.camillas_disponibles || 0})<br>
+              <b>Teléfono:</b> ${p.telefono_eess || 'N/A'}<br>
+              <b>Jefe EESS:</b> ${p.jefe_eess || 'N/A'}<br>
+              <button class="btn-edit-popup" onclick="abrirModalEditar('${p.cod_ren}')">✏️ Editar Datos</button>
+            </div>
+          `;
+          layer.bindPopup(popupContent);
+        }
+      }).addTo(map);
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify(rows))
-      .setMimeType(ContentService.MimeType.JSON);
-
-  } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-// 2. ESCRITURA PROTEGIDA EN RANGOS EDITABLES (doPost)
-function doPost(e) {
-  try {
-    let payload;
-    if (e.postData && e.postData.contents) {
-      payload = JSON.parse(e.postData.contents);
-    } else {
-      payload = e.parameter;
+    // 4. Cierre del modal
+    function cerrarModal() {
+      document.getElementById('modalEESS').style.display = 'none';
     }
 
-    // Validar clave de autorización
-    if (String(payload.clave).trim() !== "6c07") {
-      return ContentService
-        .createTextOutput(JSON.stringify({ status: "error", message: "Clave de autorización incorrecta." }))
-        .setMimeType(ContentService.MimeType.JSON);
+    // 5. Modal y Edición
+    function abrirModalEditar(codRen) {
+      const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRen).trim());
+      if (!feature) return;
+
+      const p = feature.properties;
+      document.getElementById('editCodRen').value = p.cod_ren;
+      document.getElementById('editNombre').value = p.eess || '';
+      document.getElementById('editClave').value = ''; // Limpiar campo clave
+      
+      document.getElementById('editTipoAtencion').value = (p.tipo_atencion || 'UVICLIN').toUpperCase().trim();
+      document.getElementById('editEstado').value = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+      
+      document.getElementById('editCamasOcup').value = p.camas_ocupadas || 0;
+      document.getElementById('editCamasDisp').value = p.camas_disponibles || 0;
+      document.getElementById('editCamasMosq').value = p.camas_mosquiteros || 0;
+
+      document.getElementById('editCamillasOcup').value = p.camillas_ocupadas || 0;
+      document.getElementById('editCamillasDisp').value = p.camillas_disponibles || 0;
+      document.getElementById('editCamillasMosq').value = p.camillas_mosquiteros || 0;
+
+      document.getElementById('editTelEESS').value = p.telefono_eess || '';
+      document.getElementById('editJefeEESS').value = p.jefe_eess || '';
+      document.getElementById('editTelJefe').value = p.telefono_jefe_eess || '';
+      document.getElementById('editCorreoEESS').value = p.correo_eess || '';
+      document.getElementById('editHorarioUVI').value = p.horario_uvi || '';
+      document.getElementById('editDiasAtencion').value = p.dias_atencion || '';
+      document.getElementById('editBrigadas').value = p.brigadas || '';
+      document.getElementById('editRRHH').value = p.rrhh || '';
+      document.getElementById('editEspacioCamas').value = p.espacio_camas || '';
+      document.getElementById('editObservacion').value = p.observación || p.observacion || '';
+
+      document.getElementById('modalEESS').style.display = 'flex';
     }
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("EESS_CAMAS") || ss.getSheetByName("EESS_CAMAS_2026") || ss.getSheets()[0];
-    
-    const lastCol = sheet.getLastColumn();
-    const data = sheet.getDataRange().getDisplayValues();
-    const headers = data[0].map(h => String(h).trim());
+    function guardarFormularioEESS(event) {
+      event.preventDefault();
+      const codRenTarget = document.getElementById('editCodRen').value;
+      const claveIngresada = document.getElementById('editClave').value.trim();
+      const btnGuardar = document.getElementById('btnGuardarModal');
 
-    // Identificar columna 'cod_ren' o 'Id' para buscar la fila
-    let renColumnIndex = headers.indexOf("cod_ren");
-    if (renColumnIndex === -1) renColumnIndex = headers.indexOf("Id");
-    if (renColumnIndex === -1) throw new Error("No se encontró la columna 'cod_ren' en la hoja.");
-
-    let rowIndexToUpdate = -1;
-    const targetCodRen = String(payload.cod_ren || payload.Id || "").trim();
-
-    for (let i = 1; i < data.length; i++) {
-      let cellValue = String(data[i][renColumnIndex]).trim();
-      if (cellValue === targetCodRen || parseInt(cellValue, 10) === parseInt(targetCodRen, 10)) {
-        rowIndexToUpdate = i + 1; // Fila real en la hoja (1-based)
-        break;
+      // Validar clave de seguridad
+      if (claveIngresada !== "6c07") {
+        alert("❌ Error: La clave de edición es incorrecta. No se realizaron cambios.");
+        document.getElementById('editClave').focus();
+        return;
       }
-    }
 
-    if (rowIndexToUpdate > 0) {
-      // Preprocesamiento numérico
-      const camasOcup = parseInt(payload.camas_ocupadas) || 0;
-      const camasDisp = parseInt(payload.camas_disponibles) || 0;
-      const camillasOcup = parseInt(payload.camillas_ocupadas) || 0;
-      const camillasDisp = parseInt(payload.camillas_disponibles) || 0;
+      const txtObs = document.getElementById('editObservacion').value || "";
 
-      const camasTotales = camasOcup + camasDisp;
-      const porcOcupCamas = camasTotales > 0 ? (camasOcup / camasTotales) : 0;
-      const camillasTotales = camillasOcup + camillasDisp;
-      const porcOcupCamillas = camillasTotales > 0 ? (camillasOcup / camillasTotales) : 0;
-
-      const valObs = payload.observación || payload.observacion || "";
-
-      // Mapa de valores para las columnas F a AB
-      const valoresEditables = {
-        "fecha": payload.fecha || Utilities.formatDate(new Date(), "GMT-5", "dd/MM/yy"),
-        "tipo_atencion": payload.tipo_atencion || "",
-        "estado_uviclin": payload.estado_uviclin || "",
-        "camas_ocupadas": camasOcup,
-        "camas_disponibles": camasDisp,
-        "camas_totales": camasTotales,
-        "porc_ocupacion": porcOcupCamas,
-        "camas_mosquiteros": parseInt(payload.camas_mosquiteros) || 0,
-        "camillas_ocupadas": camillasOcup,
-        "camillas_disponibles": camillasDisp,
-        "camillas_totales": camillasTotales,
-        "porc_ocup_camill": porcOcupCamillas,
-        "camillas_mosquiteros": parseInt(payload.camillas_mosquiteros) || 0,
-        "espacio_camas": payload.espacio_camas || "",
-        "observación": valObs,
-        "observacion": valObs,
-        "brigadas": payload.brigadas || "",
-        "rrhh": payload.rrhh || "",
-        "horario_uvi": payload.horario_uvi || "",
-        "telefono_eess": payload.telefono_eess || "",
-        "jefe_eess": payload.jefe_eess || "",
-        "telefono_jefe_eess": payload.telefono_jefe_eess || "",
-        "dias_atencion": payload.dias_atencion || "",
-        "correo_eess": payload.correo_eess || ""
+      const payload = {
+        cod_ren: codRenTarget,
+        clave: claveIngresada,
+        tipo_atencion: document.getElementById('editTipoAtencion').value,
+        estado_uviclin: document.getElementById('editEstado').value,
+        camas_ocupadas: parseInt(document.getElementById('editCamasOcup').value) || 0,
+        camas_disponibles: parseInt(document.getElementById('editCamasDisp').value) || 0,
+        camas_mosquiteros: parseInt(document.getElementById('editCamasMosq').value) || 0,
+        camillas_ocupadas: parseInt(document.getElementById('editCamillasOcup').value) || 0,
+        camillas_disponibles: parseInt(document.getElementById('editCamillasDisp').value) || 0,
+        camillas_mosquiteros: parseInt(document.getElementById('editCamillasMosq').value) || 0,
+        telefono_eess: document.getElementById('editTelEESS').value || "",
+        jefe_eess: document.getElementById('editJefeEESS').value || "",
+        telefono_jefe_eess: document.getElementById('editTelJefe').value || "",
+        correo_eess: document.getElementById('editCorreoEESS').value || "",
+        horario_uvi: document.getElementById('editHorarioUVI').value || "",
+        dias_atencion: document.getElementById('editDiasAtencion').value || "",
+        brigadas: document.getElementById('editBrigadas').value || "",
+        rrhh: document.getElementById('editRRHH').value || "",
+        espacio_camas: document.getElementById('editEspacioCamas').value || "",
+        observación: txtObs,
+        observacion: txtObs
       };
 
-      // Recorremos ÚNICAMENTE desde la Columna F (6) hasta la Columna AB (28)
-      // Esto protege al 100% las Columnas A-E y AC-AF de ser modificadas
-      for (let col = 6; col <= 28; col++) {
-        let headerName = String(headers[col - 1] || "").trim();
+      btnGuardar.innerText = "Guardando...";
+      btnGuardar.disabled = true;
+
+      fetch(URL_WEB_APP, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        alert("✅ ¡Éxito! Clave validada y cambios guardados correctamente en Google Sheets.");
         
-        // Buscar coincidencia en nuestro mapa (con o sin tilde para observación)
-        if (valoresEditables.hasOwnProperty(headerName)) {
-          sheet.getRange(rowIndexToUpdate, col).setValue(valoresEditables[headerName]);
+        // Actualizar datos en la memoria del mapa
+        const feature = eessGeoJSON.features.find(f => String(f.properties.cod_ren).trim() === String(codRenTarget).trim());
+        if (feature) {
+          Object.assign(feature.properties, payload);
+          feature.properties.camas_totales = payload.camas_ocupadas + payload.camas_disponibles;
+          feature.properties.camillas_totales = payload.camillas_ocupadas + payload.camillas_disponibles;
         }
-      }
 
-      return ContentService
-        .createTextOutput(JSON.stringify({ status: "success", message: "Establecimiento actualizado correctamente" }))
-        .setMimeType(ContentService.MimeType.JSON);
-
-    } else {
-      throw new Error("No se encontró el código RENAES (" + targetCodRen + ") en la hoja.");
+        cerrarModal();
+        filtrarEstablecimientos();
+      })
+      .catch(err => {
+        alert("❌ Error al guardar: " + err);
+      })
+      .finally(() => {
+        btnGuardar.innerText = "Guardar Cambios";
+        btnGuardar.disabled = false;
+      });
     }
 
-  } catch (error) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
+    // 6. Controles Auxiliares
+    function toggleEtiquetas() {
+      etiquetasVisibles = !etiquetasVisibles;
+      const btn = document.getElementById('btnToggleLabels');
+      const etiquetas = document.querySelectorAll('.label-eess');
+
+      if (etiquetasVisibles) {
+        btn.innerText = '🏷️ Etiquetas: ON';
+        btn.classList.add('active');
+        etiquetas.forEach(el => el.classList.remove('label-eess-hidden'));
+      } else {
+        btn.innerText = '🏷️ Etiquetas: OFF';
+        btn.classList.remove('active');
+        etiquetas.forEach(el => el.classList.add('label-eess-hidden'));
+      }
+    }
+
+    // 7. GPS y Ruteo OSRM
+    function obtenerUbicacionGPS() {
+      if (!navigator.geolocation) {
+        alert("Tu navegador no soporta geolocalización por GPS.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const userLat = pos.coords.latitude;
+          const userLng = pos.coords.longitude;
+          const userLngLat = [userLng, userLat];
+
+          if (userMarker) map.removeLayer(userMarker);
+          userMarker = L.marker([userLat, userLng], {
+            icon: L.divIcon({
+              className: 'user-icon',
+              html: '<div style="background-color:#d9534f; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 6px rgba(0,0,0,0.5);"></div>'
+            })
+          }).addTo(map).bindPopup("<b>Tu Ubicación Actual</b>").openPopup();
+
+          map.setView([userLat, userLng], 14);
+          calcularRutaEESSMasCercano(userLngLat);
+        },
+        (error) => alert("Error al obtener GPS: " + error.message),
+        { enableHighAccuracy: true }
+      );
+    }
+
+    function calcularRutaEESSMasCercano(userLngLat) {
+      const filtroTipo = document.getElementById('selectTipoAtencion').value;
+      const filtroEstado = document.getElementById('selectEstado').value;
+
+      const featuresVisibles = eessGeoJSON.features.filter(f => {
+        const p = f.properties;
+        const cumpleTipo = (filtroTipo === "TODOS") || (p.tipo_atencion === filtroTipo);
+        const estadoReal = String(p.estado_uviclin || p.estado || 'ACTIVO').toUpperCase().trim();
+        const cumpleEstado = (filtroEstado === "TODOS") || (estadoReal === filtroEstado);
+        return cumpleTipo && cumpleEstado;
+      });
+
+      if (featuresVisibles.length === 0) {
+        alert("No hay establecimientos disponibles con los filtros seleccionados.");
+        return;
+      }
+
+      const geojsonEvaluar = turf.featureCollection(featuresVisibles);
+      const origenTurf = turf.point(userLngLat);
+      const masCercano = turf.nearestPoint(origenTurf, geojsonEvaluar);
+      const destinoCoords = masCercano.geometry.coordinates;
+      const p = masCercano.properties;
+
+      const url = `https://router.project-osrm.org/route/v1/driving/${userLngLat[0]},${userLngLat[1]};${destinoCoords[0]},${destinoCoords[1]}?overview=full&geometries=geojson`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.routes && data.routes.length > 0) {
+            if (rutaLayer) map.removeLayer(rutaLayer);
+
+            const geometry = data.routes[0].geometry;
+            const duracionMin = Math.round(data.routes[0].duration / 60);
+            const distanciaKm = (data.routes[0].distance / 1000).toFixed(2);
+
+            rutaLayer = L.geoJSON(geometry, { style: { color: '#0055ff', weight: 6, opacity: 0.85 } }).addTo(map);
+
+            let badgeClass = 'badge badge-default';
+            if (p.tipo_atencion === "UVICLIN") badgeClass = 'badge badge-uviclin';
+            if (p.tipo_atencion === "UNIDAD FEBRIL") badgeClass = 'badge badge-febril';
+
+            L.popup({
+              offset: [0, -35],
+              autoPan: true,
+              autoPanPadding: [20, 20]
+            })
+              .setLatLng([destinoCoords[1], destinoCoords[0]])
+              .setContent(`
+                <div class="popup-eess">
+                  <b>EESS Más Cercano:</b> ${p.eess}<br>
+                  <span class="${badgeClass}">${p.tipo_atencion || 'EESS'} - Cat. ${p.CAT_DESCRIP || 'N/A'}</span><br>
+                  <b>RIS:</b> ${p.ris || ''}<hr>
+                  <b>Distancia vial:</b> ${distanciaKm} km<br>
+                  <b>Tiempo estimado:</b> ${duracionMin} minutos
+                </div>
+              `)
+              .openOn(map);
+          }
+        });
+    }
+  </script>
+</body>
+</html>
