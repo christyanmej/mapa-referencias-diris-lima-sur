@@ -432,6 +432,25 @@
         return cumpleTipo && cumpleEstado;
       });
 
+      // --- ACTUALIZACIÓN DE CONTADORES ---
+      let countUviclin = 0;
+      let countFebril = 0;
+
+      featuresFiltrados.forEach(f => {
+        const tipo = String(f.properties.tipo_atencion || '').toUpperCase().trim();
+        if (tipo === "UVICLIN") {
+          countUviclin++;
+        } else if (tipo === "UNIDAD FEBRIL") {
+          countFebril++;
+        }
+      });
+
+      // Actualizar el DOM de la leyenda
+      document.getElementById('cantUviclin').innerText = countUviclin;
+      document.getElementById('cantFebril').innerText = countFebril;
+      document.getElementById('cantTotal').innerText = featuresFiltrados.length;
+      // -----------------------------------
+
       const labelClass = etiquetasVisibles ? 'label-eess' : 'label-eess label-eess-hidden';
 
       geojsonLayer = L.geoJSON(turf.featureCollection(featuresFiltrados), {
